@@ -1,0 +1,21 @@
+body {
+    background-color: #f1f5f9; /* Updated to slate-100 */
+    color: #1e293b; /* Updated to slate-800 */
+    font-family: Inter, sans-serif; /* Added a default sans-serif font */
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.dashboard-container {
+    padding: 24px; /* Adjusted padding */
+    max-width: 1920px;
+    margin: 0 auto;
+}
+
+.chart-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}

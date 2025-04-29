@@ -1,0 +1,245 @@
+/*
+  # Create dashboard functions
+
+  1. New Functions
+    - get_call_status: Helper function to determine call status from tabulation
+    - get_dashboard_metrics: Main KPIs for OperationsOverview
+    - get_status_distribution: Data for pie charts
+    - get_hourly_tabulation_counts: Data for hourly bar chart
+    - get_tabulation_distribution: Data for tabulation distribution chart
+    - get_state_map_data: Data for Brazil map visualization
+    - get_distinct_operators: List of operators for filters
+    - get_distinct_states: List of states for filters
+
+  2. Security
+    - All functions are SECURITY DEFINER to work with RLS
+    - Functions are marked as STABLE for query optimization
+*/
+
+-- Helper function to determine call status
+CREATE OR REPLACE FUNCTION get_call_status(tabulation_value TEXT)
+RETURNS TEXT AS $$
+DECLARE
+  failure_tabulations TEXT[] := ARRAY['LIGAÇÃO CAIU', 'CAIXA POSTAL', 'LIGAÇÃO MUDA', 'TELEFONE INCORRETO', 'TEMPO POS CHAMADA EXCEDIDO'];
+  abandoned_tabulations TEXT[] := ARRAY['CLIENTE DESLIGOU', 'CLIENTE AUSENTE'];
+BEGIN
+  IF tabulation_value = ANY(failure_tabulations) THEN
+    RETURN 'Falha';
+  ELSIF tabulation_value = ANY(abandoned_tabulations) THEN
+    RETURN 'Abandonada';
+  ELSIF tabulation_value IS NOT NULL AND tabulation_value != '' THEN
+    RETURN 'Atendida';
+  ELSE
+    RETURN 'Desconhecido';
+  END IF;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Main dashboard metrics
+CREATE OR REPLACE FUNCTION get_dashboard_metrics(
+    start_date TIMESTAMP WITH TIME ZONE,
+    end_date TIMESTAMP WITH TIME ZONE,
+    filter_state TEXT DEFAULT NULL,
+    filter_operator_name TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+    "totalLigações" BIGINT,
+    "ligaçõesAtendidasCount" BIGINT,
+    "ligaçõesAbandonadasCount" BIGINT,
+    "ligaçõesFalhaCount" BIGINT,
+    "tma" NUMERIC,
+    "taxaSucesso" NUMERIC,
+    "sucessoTabulacoesCount" BIGINT,
+    "taxaNaoEfetivo" NUMERIC,
+    "taxaProdutividade" NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH filtered_calls AS (
+        SELECT
+            *,
+            get_call_status(tabulation) as call_status
+        FROM public.call_records cr
+        WHERE cr.call_timestamp >= start_date 
+          AND cr.call_timestamp <= end_date
+          AND (filter_state IS NULL OR filter_state = 'all' OR cr.uf = filter_state)
+          AND (filter_operator_name IS NULL OR filter_operator_name = 'all' OR cr.operator_name = filter_operator_name)
+    ),
+    metrics AS (
+        SELECT
+            COUNT(*) as total_calls,
+            COUNT(*) FILTER (WHERE call_status = 'Atendida') as attended_calls,
+            COUNT(*) FILTER (WHERE call_status = 'Abandonada') as abandoned_calls,
+            COUNT(*) FILTER (WHERE call_status = 'Falha') as failed_calls,
+            AVG(EXTRACT(EPOCH FROM call_duration)) FILTER (WHERE call_status = 'Atendida') as avg_duration,
+            COUNT(*) FILTER (WHERE call_status = 'Atendida' AND tabulation = 'ENDEREÇO CONFIRMADO') as success_count,
+            COUNT(*) FILTER (WHERE call_status = 'Atendida' AND tabulation NOT LIKE 'Status:%') as valid_tabulations
+        FROM filtered_calls
+    )
+    SELECT
+        total_calls,
+        attended_calls,
+        abandoned_calls,
+        failed_calls,
+        COALESCE(avg_duration, 0),
+        CASE WHEN valid_tabulations > 0 THEN success_count::NUMERIC / valid_tabulations ELSE 0 END,
+        success_count,
+        CASE WHEN valid_tabulations > 0 THEN (valid_tabulations - success_count)::NUMERIC / valid_tabulations ELSE 0 END,
+        CASE WHEN total_calls > 0 THEN attended_calls::NUMERIC / total_calls ELSE 0 END
+    FROM metrics;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Status distribution for pie charts
+CREATE OR REPLACE FUNCTION get_status_distribution(
+    start_date TIMESTAMP WITH TIME ZONE,
+    end_date TIMESTAMP WITH TIME ZONE,
+    filter_state TEXT DEFAULT NULL,
+    filter_operator_name TEXT DEFAULT NULL
+)
+RETURNS TABLE (label TEXT, value BIGINT) AS $$
+BEGIN
+    RETURN QUERY
+    WITH filtered_calls AS (
+        SELECT get_call_status(tabulation) as call_status
+        FROM public.call_records cr
+        WHERE cr.call_timestamp >= start_date 
+          AND cr.call_timestamp <= end_date
+          AND (filter_state IS NULL OR filter_state = 'all' OR cr.uf = filter_state)
+          AND (filter_operator_name IS NULL OR filter_operator_name = 'all' OR cr.operator_name = filter_operator_name)
+    )
+    SELECT 'Atendidas' as label, COUNT(*) as value 
+    FROM filtered_calls 
+    WHERE call_status = 'Atendida'
+    UNION ALL
+    SELECT 'Não Atendidas', COUNT(*) 
+    FROM filtered_calls 
+    WHERE call_status IN ('Abandonada', 'Falha');
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Hourly tabulation counts
+CREATE OR REPLACE FUNCTION get_hourly_tabulation_counts(
+    target_tabulation TEXT,
+    start_date TIMESTAMP WITH TIME ZONE,
+    end_date TIMESTAMP WITH TIME ZONE,
+    filter_state TEXT DEFAULT NULL,
+    filter_operator_name TEXT DEFAULT NULL
+)
+RETURNS TABLE (hora INT, value BIGINT) AS $$
+BEGIN
+    RETURN QUERY
+    WITH RECURSIVE hours AS (
+        SELECT 8 as hour
+        UNION ALL
+        SELECT hour + 1 FROM hours WHERE hour < 20
+    )
+    SELECT 
+        h.hour as hora,
+        COUNT(cr.id)::BIGINT as value
+    FROM hours h
+    LEFT JOIN public.call_records cr ON 
+        EXTRACT(HOUR FROM cr.call_timestamp) = h.hour
+        AND cr.call_timestamp >= start_date 
+        AND cr.call_timestamp <= end_date
+        AND cr.tabulation = target_tabulation
+        AND (filter_state IS NULL OR filter_state = 'all' OR cr.uf = filter_state)
+        AND (filter_operator_name IS NULL OR filter_operator_name = 'all' OR cr.operator_name = filter_operator_name)
+    GROUP BY h.hour
+    ORDER BY h.hour;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Tabulation distribution
+CREATE OR REPLACE FUNCTION get_tabulation_distribution(
+    start_date TIMESTAMP WITH TIME ZONE,
+    end_date TIMESTAMP WITH TIME ZONE,
+    filter_state TEXT DEFAULT NULL,
+    filter_operator_name TEXT DEFAULT NULL
+)
+RETURNS TABLE (label TEXT, value BIGINT) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        cr.tabulation as label,
+        COUNT(*)::BIGINT as value
+    FROM public.call_records cr
+    WHERE cr.call_timestamp >= start_date 
+      AND cr.call_timestamp <= end_date
+      AND get_call_status(cr.tabulation) = 'Atendida'
+      AND (filter_state IS NULL OR filter_state = 'all' OR cr.uf = filter_state)
+      AND (filter_operator_name IS NULL OR filter_operator_name = 'all' OR cr.operator_name = filter_operator_name)
+    GROUP BY cr.tabulation
+    ORDER BY value DESC;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- State map data
+CREATE OR REPLACE FUNCTION get_state_map_data(
+    start_date TIMESTAMP WITH TIME ZONE,
+    end_date TIMESTAMP WITH TIME ZONE,
+    filter_operator_name TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+    uf VARCHAR(2),
+    chamadas BIGINT,
+    tempoMedio NUMERIC,
+    taxaResolucao NUMERIC,
+    taxaAbandono NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH metrics AS (
+        SELECT
+            cr.uf,
+            COUNT(*) as total_calls,
+            AVG(EXTRACT(EPOCH FROM cr.call_duration)) FILTER (WHERE get_call_status(cr.tabulation) = 'Atendida') as avg_duration,
+            COUNT(*) FILTER (WHERE cr.tabulation = 'ENDEREÇO CONFIRMADO') as success_count,
+            COUNT(*) FILTER (WHERE get_call_status(cr.tabulation) = 'Atendida') as attended_count,
+            COUNT(*) FILTER (WHERE get_call_status(cr.tabulation) = 'Abandonada') as abandoned_count
+        FROM public.call_records cr
+        WHERE cr.call_timestamp >= start_date 
+          AND cr.call_timestamp <= end_date
+          AND (filter_operator_name IS NULL OR filter_operator_name = 'all' OR cr.operator_name = filter_operator_name)
+        GROUP BY cr.uf
+    )
+    SELECT
+        m.uf,
+        m.total_calls,
+        COALESCE(m.avg_duration, 0),
+        CASE WHEN m.attended_count > 0 THEN m.success_count::NUMERIC / m.attended_count ELSE 0 END,
+        CASE WHEN m.total_calls > 0 THEN m.abandoned_count::NUMERIC / m.total_calls ELSE 0 END
+    FROM metrics m
+    WHERE m.uf IS NOT NULL;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Get distinct operators
+CREATE OR REPLACE FUNCTION get_distinct_operators()
+RETURNS TABLE (id INT, nome TEXT, team TEXT) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        ROW_NUMBER() OVER (ORDER BY operator_name)::INT as id,
+        operator_name as nome,
+        'N/A'::TEXT as team
+    FROM (
+        SELECT DISTINCT operator_name
+        FROM public.call_records
+        WHERE operator_name IS NOT NULL
+        ORDER BY operator_name
+    ) ops;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Get distinct states
+CREATE OR REPLACE FUNCTION get_distinct_states()
+RETURNS TABLE (uf VARCHAR(2)) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT DISTINCT cr.uf
+    FROM public.call_records cr
+    WHERE cr.uf IS NOT NULL
+    ORDER BY cr.uf;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;

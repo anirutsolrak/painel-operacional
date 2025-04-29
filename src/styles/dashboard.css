@@ -1,0 +1,24 @@
+.operator-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+}
+
+.operator-table th {
+
+}
+
+.operator-table td {
+
+}
+
+
+.exhibition-mode {
+
+
+}
+
+.exhibition-mode .dashboard-container {
+    padding: 16px;
+}
