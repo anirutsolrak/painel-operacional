@@ -81,7 +81,6 @@ body {
     scrollbar-width: none;
 }
 
-/* Animações */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -91,7 +90,6 @@ body {
     animation: fadeIn 0.3s ease-out forwards;
 }
 
-/* Responsividade para telas pequenas */
 @media (max-width: 640px) {
     .dashboard-container {
         @apply px-3 py-4;
@@ -102,7 +100,6 @@ body {
     }
 }
 
-/* Melhorias de acessibilidade */
 @media (prefers-reduced-motion: reduce) {
     * {
         animation-duration: 0.01ms !important;

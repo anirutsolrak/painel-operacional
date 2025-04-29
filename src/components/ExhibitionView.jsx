@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import dataUtils from '../utils/dataUtils';
 import BarChart from '../components/charts/BarChart.jsx';
@@ -6,18 +6,6 @@ import DoughnutChart from '../components/charts/DoughnutChart.jsx';
 import LineChart from '../components/charts/LineChart.jsx';
 
 function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistribution, goalValue, operatorsList, selectedOperatorId, KPI_Card, selectedDateRange, isLoading, error }) {
-
-    console.warn("✨📊 [ExhibitionView] Render. Props received:", {
-        metrics,
-        previousMetrics,
-        hourlyData: hourlyData ? hourlyData.length : 0,
-        tabulationDistribution: tabulationDistribution ? tabulationDistribution.length : 0,
-        goalValue,
-        selectedOperatorId,
-        selectedDateRange,
-        isLoading,
-        error
-    });
 
     const tempoPerdidoTabulations = useMemo(() => [
         'telefone incorreto',
@@ -34,7 +22,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
     ].map(tab => tab.toLowerCase()), []);
 
     const attendedVsOthersData = useMemo(() => {
-        console.log("✨📊 [ExhibitionView] Calculating attendedVsOthersData. Input metrics:", metrics);
         const attendedCount = metrics?.ligaçõesAtendidasCount || 0;
         const totalCalls = metrics?.totalLigações || 0;
         const othersCount = totalCalls - attendedCount;
@@ -44,20 +31,16 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
             { label: 'Outras', value: othersCount },
         ].filter(d => d.value > 0);
 
-        console.log("✨📊 [ExhibitionView] attendedVsOthersData:", data);
         return data;
     }, [metrics]);
 
     const hourlyCallsData = useMemo(() => {
-        console.log("✨📊 [ExhibitionView] Calculating hourlyCallsData. Input hourlyData:", hourlyData);
         if (!hourlyData) return [];
         const data = hourlyData.map(d => ({ label: `${d.hora.toString().padStart(2, '0')}:00`, value: d.chamadas }));
-        console.log("✨📊 [ExhibitionView] hourlyCallsData:", data);
         return data;
     }, [hourlyData]);
 
     const topTabulationsData = useMemo(() => {
-        console.log("✨📊 [ExhibitionView] Calculating topTabulationsData. Input tabulationDistribution:", tabulationDistribution);
         if (!tabulationDistribution) return [];
 
          const filteredData = tabulationDistribution.filter(item => {
@@ -70,7 +53,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
              .slice(0, 5)
              .map(d => ({ label: d.tabulation, value: d.count }));
 
-        console.log("✨📊 [ExhibitionView] topTabulationsData:", data);
         return data;
       }, [tabulationDistribution, tempoPerdidoTabulations]);
 
@@ -158,7 +140,7 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
      const abandonTrend = dataUtils.calculateTrend(metrics?.ligaçõesAbandonadasCount, previousMetrics?.ligaçõesAbandonadasCount);
      const tempoPerdidoTrend = dataUtils.calculateTrend(metrics?.tempoPerdidoSegundos, previousMetrics?.tempoPerdidoSegundos);
      const sucessoRateTrend = dataUtils.calculateTrend(metrics?.taxaSucesso, previousMetrics?.taxaSucesso);
-     const naoEfetivoRateTrend = dataUtils.calculateTrend(metrics?.taxaNaoEfetivo, previousMetrics?.taxaNaoEfetivo); // Corrigido para naoEfetivoRateTrend
+     const naoEfetivoRateTrend = dataUtils.calculateTrend(metrics?.taxaNaoEfetivo, previousMetrics?.taxaNaoEfetivo);
      const tmaTrend = dataUtils.calculateTrend(metrics?.tma, previousMetrics?.tma);
 
     const hasMetricsData = metrics && (metrics.totalLigações > 0 || metrics.ligaçõesAtendidasCount > 0 || metrics.ligaçõesAbandonadasCount > 0 || metrics.ligaçõesFalhaCount > 0 || metrics.sucessoTabulacoesCount > 0);
@@ -168,12 +150,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
     const showMetricsPlaceholder = !isLoading && !error && !hasMetricsData;
     const showHourlyPlaceholder = !isLoading && !error && !hasHourlyData;
     const showTabulationPlaceholder = !isLoading && !error && !hasTabulationData;
-
-    console.log("✨📊 [ExhibitionView] Placeholder states:", {
-        showMetricsPlaceholder,
-        showHourlyPlaceholder,
-        showTabulationPlaceholder
-    });
 
     const dateRangeSuffix = selectedDateRange === 'today' ? '(Hoje)' : selectedDateRange === 'week' ? '(Últimos 7 Dias)' : '';
 
@@ -254,7 +230,7 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                                             </div>
                                        )}
 
-                                        
+
                                         {calculatedGoalValue > 0 && (
                                              <motion.div
                                                 initial={{ opacity: 0, scale: 0.8 }}
@@ -269,7 +245,7 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                                              </motion.div>
                                         )}
 
-                                         
+
                                          {calculatedGoalValue > 0 && (
                                               <motion.div
                                                  initial={{ opacity: 0, y: 10 }}
@@ -336,8 +312,8 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                  </div>
              </div>
              </>
-        )} 
-        </div> 
+        )}
+        </div>
     );
 }
 

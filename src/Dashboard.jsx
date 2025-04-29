@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import Chart from 'chart.js/auto';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
-
+import Chart from 'chart.js/auto';
 import Header from './components/Header.jsx';
 import Filters from './components/Filters.jsx';
 import OperationsOverview from './components/OperationsOverview.jsx';
@@ -41,7 +40,6 @@ function KPI_Card({ title, value, unit = '', trendValue = null, trendDirection =
     );
 }
 
-
 function Dashboard({ onLogout, user }) {
   const [filters, setFilters] = useState({
     dateRange: 'today',
@@ -66,52 +64,43 @@ function Dashboard({ onLogout, user }) {
   const [goalValue, setGoalValue] = useState('');
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [errorData, setErrorData] = useState(null);
-
    const [exhibitionDateRange, setExhibitionDateRange] = useState('week');
 
-
   const onToggleUpload = useCallback(() => {
-    console.log("📊 [Dashboard] Toggling upload visibility");
     setShowUpload(prev => !prev);
   }, []);
 
   const handleFilterChange = useCallback((newFilters) => {
     if (displayMode === 'navigation') {
-      console.log("📊 [Dashboard] Filter Change:", newFilters);
       setFilters(newFilters);
     }
   }, [displayMode]);
 
   const handleOperatorChange = useCallback((operatorId) => {
     if (displayMode === 'navigation') {
-      console.log("📊 [Dashboard] Operator Change:", operatorId);
       setSelectedOperatorId(operatorId || 'all');
     }
   }, [displayMode]);
 
   const handleMapRegionChange = useCallback((region) => {
     if (displayMode === 'navigation') {
-      console.log("📊 [Dashboard] Map Region Change:", region);
       setSelectedMapRegion(region);
     }
   }, [displayMode]);
 
   const handleMapMetricChange = useCallback((metric) => {
     if (displayMode === 'navigation') {
-      console.log("📊 [Dashboard] Map Metric Change:", metric);
       setSelectedMapMetric(metric);
     }
   }, [displayMode]);
 
   const toggleDisplayMode = useCallback(() => {
-    console.log("📊 [Dashboard] Toggling display mode");
     setDisplayMode((prevMode) =>
       prevMode === 'navigation' ? 'exhibition' : 'navigation'
     );
   }, []);
 
   const handleUploadComplete = useCallback(() => {
-    console.log("📊 [Dashboard] Upload Complete");
     setShowUpload(false);
   }, []);
 
@@ -123,10 +112,8 @@ function Dashboard({ onLogout, user }) {
   }, []);
 
    const handleExhibitionDateRangeChange = useCallback((newDateRange) => {
-       console.log("📊 [Dashboard] Exhibition Date Range Change:", newDateRange);
        setExhibitionDateRange(newDateRange);
    }, []);
-
 
   const brazilRegions = useMemo(
     () => [
@@ -145,19 +132,12 @@ function Dashboard({ onLogout, user }) {
     { value: 'taxaSucesso', label: 'Taxa de Sucesso' },
   ], []);
 
-  const canFetchFilteredData = operatorsList.length > 0 || selectedOperatorId === 'all';
-
-
   const fetchDataForFilters = useCallback(async () => {
-    console.log("📊 [Dashboard fetchDataForFilters] Executing fetch for navigation mode.");
     const operatorNameFilter = selectedOperatorId && selectedOperatorId !== 'all'
       ? operatorsList.find(op => op.id.toString() === selectedOperatorId)?.operator_name || null
       : null;
-    console.log("📊 [Dashboard fetchDataForFilters] Derivando operatorNameFilter para busca de dados:", operatorNameFilter);
 
     const dateParams = dataUtils.getDateRangeParams(filters.dateRange);
-    console.log("📊 [Dashboard fetchDataForFilters] Datas calculadas:", dateParams);
-
 
     const currentFilters = {
       start_date: dateParams.current_start_date,
@@ -166,7 +146,6 @@ function Dashboard({ onLogout, user }) {
       filter_operator_name: operatorNameFilter,
       filter_region: filters.region === 'all' ? null : filters.region,
     };
-    console.log("📊 [Dashboard fetchDataForFilters] Filtros para RPCs (current period):", currentFilters);
 
      const previousFilters = {
          start_date: dateParams.previous_start_date,
@@ -175,13 +154,10 @@ function Dashboard({ onLogout, user }) {
          filter_operator_name: operatorNameFilter,
          filter_region: filters.region === 'all' ? null : filters.region,
      }
-     console.log("📊 [Dashboard fetchDataForFilters] Filtros para RPCs (previous period):", previousFilters);
-
 
     setIsLoadingData(true);
     setErrorData(null);
     try {
-      console.log("📊 [Dashboard fetchDataForFilters] Calling Promise.all for filtered data...");
       const [
         metricsResult,
         tabulationDistributionResult,
@@ -197,17 +173,10 @@ function Dashboard({ onLogout, user }) {
         dataUtils.getTimeSeriesData(currentFilters),
       ]);
 
-      console.log("📊 [Dashboard] Raw metricsResult:", metricsResult);
-      console.log("📊 [Dashboard] Raw tabulationDistributionResult:", tabulationDistributionResult);
-      console.log("📊 [Dashboard] Raw stateMapResult:", stateMapResult);
-      console.log("📊 [Dashboard] Raw hourlyDataResult:", hourlyDataResult);
-
-
       if (metricsResult.error) throw metricsResult.error;
       if (tabulationDistributionResult.error) console.error("📊 [Dashboard] Erro ao carregar distribuição de tabulação:", tabulationDistributionResult.error);
       if (stateMapResult.error) console.error("📊 [Dashboard] Erro ao carregar dados do mapa:", stateMapResult.error);
       if (hourlyDataResult.error) console.error("📊 [Dashboard] Erro ao carregar dados horários:", hourlyDataResult.error);
-
 
       setMetrics({
         current: metricsResult.current,
@@ -223,15 +192,10 @@ function Dashboard({ onLogout, user }) {
           }
           return acc;
         }, {});
-        console.log("📍🗺️ [Dashboard fetchDataForFilters] stateMapData transformed:", stateMapDataTransformed);
-
-      } else {
-        console.warn("📍🗺️ [Dashboard] stateMapResult.data is not an array. Initializing stateMapDataTransformed to {}.", stateMapResult.data);
       }
 
       setStateMapData(stateMapDataTransformed);
       setHourlyData(hourlyDataResult.data || []);
-      console.log("📊 [Dashboard fetchDataForFilters] Dados filtrados Navegação carregados.", { metrics: metricsResult.current, tabulationDistributionNav: (tabulationDistributionResult.data || []).length, stateMapData: Object.keys(stateMapDataTransformed).length, hourlyData: (hourlyDataResult.data || []).length });
 
     } catch (err) {
       console.error("📊 [Dashboard] Erro geral ao carregar dados filtrados:", err);
@@ -242,20 +206,15 @@ function Dashboard({ onLogout, user }) {
       setHourlyData([]);
     } finally {
       setIsLoadingData(false);
-      console.log("📊 [Dashboard fetchDataForFilters] Carregamento finalizado.");
     }
   }, [filters, selectedOperatorId, operatorsList]);
 
-
   const fetchDataForExhibition = useCallback(async () => {
-    console.log("📊 [Dashboard fetchDataForExhibition] Executing fetch for exhibition mode.");
-
     setIsLoadingData(true);
     setErrorData(null);
     setMetricsToday({ current: null, previous: null });
     setHourlyDataToday([]);
     setTabulationDistributionToday([]);
-    console.log("📊 [Dashboard fetchDataForExhibition] Cleared previous exhibition data state.");
 
     const dateParams = dataUtils.getDateRangeParams(exhibitionDateRange);
      const exhibitionRpcFilters = {
@@ -265,8 +224,6 @@ function Dashboard({ onLogout, user }) {
          filter_operator_name: null,
          filter_region: null,
      };
-    console.log(`📊 [Dashboard fetchDataForExhibition] Buscando dados para Exibição (${exhibitionDateRange}):`, exhibitionRpcFilters);
-
 
     const previousDateParams = dataUtils.getDateRangeParams(exhibitionDateRange);
 
@@ -278,18 +235,13 @@ function Dashboard({ onLogout, user }) {
          filter_region: null,
     };
 
-
     try {
-      console.log("📊 [Dashboard fetchDataForExhibition] Calling Promise.all for exhibition data...");
-
       const metricsExhibitionResult = await dataUtils.getPerformanceMetrics({
            currentFilters: exhibitionRpcFilters,
            previousFilters: previousExhibitionRpcFilters,
        });
-      console.log("📊 [Dashboard] Raw metricsExhibitionResult (separate call):", metricsExhibitionResult);
 
       if (metricsExhibitionResult.error) throw metricsExhibitionResult.error;
-
 
       const [
           hourlyDataExhibitionResult,
@@ -299,13 +251,8 @@ function Dashboard({ onLogout, user }) {
           dataUtils.getTabulationDistribution(exhibitionRpcFilters),
       ]);
 
-
-      console.log("📊 [Dashboard] Raw hourlyDataExhibitionResult:", hourlyDataExhibitionResult);
-      console.log("📊 [Dashboard] Raw tabulationDistributionExhibitionResult:", tabulationDistributionExhibitionResult);
-
       if (hourlyDataExhibitionResult.error) console.error("📊 [Dashboard] Erro ao carregar dados horários de exibição:", hourlyDataExhibitionResult.error);
       if (tabulationDistributionExhibitionResult.error) console.error("📊 [Dashboard] Erro ao carregar tabulações de exibição:", tabulationDistributionExhibitionResult.error);
-
 
       setMetricsToday({
           current: metricsExhibitionResult.current || null,
@@ -313,8 +260,6 @@ function Dashboard({ onLogout, user }) {
       });
       setHourlyDataToday(hourlyDataExhibitionResult.data || []);
       setTabulationDistributionToday(tabulationDistributionExhibitionResult.data || []);
-
-      console.log(`📊 [Dashboard fetchDataForExhibition] Dados Modo Exibição (${exhibitionDateRange}) carregados.`, { metrics: metricsExhibitionResult.current, hourlyData: (hourlyDataExhibitionResult.data || []).length, tabulationDistribution: (tabulationDistributionExhibitionResult.data || []).length });
 
     } catch (err) {
       console.error("📊 [Dashboard] Erro geral ao carregar dados de Exibição:", err);
@@ -324,33 +269,24 @@ function Dashboard({ onLogout, user }) {
       setTabulationDistributionToday([]);
     } finally {
       setIsLoadingData(false);
-      console.log("📊 [Dashboard fetchDataForExhibition] Carregamento finalizado. isLoadingData:", false);
     }
   }, [exhibitionDateRange]);
-
 
   useEffect(() => {
     const fetchInitialLists = async () => {
       try {
-        console.log("📊 [Dashboard] Buscando listas iniciais de operadores, estados e regiões...");
         const [operatorsResult, statesListResult, regionsListResult] = await Promise.all([
           dataUtils.getOperators(),
           dataUtils.getStates(),
           dataUtils.getRegions(),
         ]);
-        console.log("📊 [Dashboard] Raw operatorsResult:", operatorsResult);
-        console.log("📊 [Dashboard] Raw statesListResult:", statesListResult);
-        console.log("📊 [Dashboard] Raw regionsListResult:", regionsListResult);
-
         if (operatorsResult.error) console.error("📊 [Dashboard] Erro ao carregar operadores:", operatorsResult.error);
         if (statesListResult.error) console.error("📊 [Dashboard] Erro ao carregar estados:", statesListResult.error);
         if (regionsListResult.error) console.error("📊 [Dashboard] Erro ao carregar regiões:", regionsListResult.error);
 
-
         setOperatorsList(operatorsResult.data || []);
         setStatesList(statesListResult.data || []);
         setRegionsList(regionsListResult.data || []);
-        console.log("📊 [Dashboard] Listas iniciais carregadas.", { operators: (operatorsResult.data || []).length, states: (statesListResult.data || []).length, regions: (regionsListResult.data || []).length });
       } catch (err) {
         console.error("📊 [Dashboard] Erro geral ao carregar listas iniciais:", err);
         setErrorData("Falha ao carregar listas iniciais. Tente recarregar a página.");
@@ -366,26 +302,22 @@ function Dashboard({ onLogout, user }) {
     }
   }, [operatorsList.length, statesList.length, regionsList.length]);
 
-
   useEffect(() => {
     if (displayMode === 'navigation') {
       if (operatorsList.length > 0 || selectedOperatorId === 'all') {
         fetchDataForFilters();
       } else {
-        console.log("📊 [Dashboard useEffect] Aguardando lista de operadores para buscar dados filtrados pela primeira vez.");
         if (!isLoadingData) setIsLoadingData(true);
         if (errorData) setErrorData(null);
       }
     }
   }, [filters, selectedOperatorId, operatorsList.length, displayMode, fetchDataForFilters]);
 
-
   useEffect(() => {
     if (displayMode === 'exhibition') {
          fetchDataForExhibition();
     }
   }, [displayMode, exhibitionDateRange, fetchDataForExhibition]);
-
 
   const tempoPerdidoTabulations = useMemo(() => [
       'telefone incorreto',
@@ -417,7 +349,6 @@ function Dashboard({ onLogout, user }) {
 
    const showTabulationPlaceholderNav = !tabulationDistributionNav || tabulationDistributionNav.length === 0 || validTabulationDataNav.length === 0;
 
-
   return (
     <div
       data-name="dashboard"
@@ -433,13 +364,11 @@ function Dashboard({ onLogout, user }) {
         onToggleUpload={onToggleUpload}
         user={user}
       />
-
         {displayMode === 'navigation' ? (
           <main className="dashboard-container">
             {showUpload && (
               <FileUpload onUploadComplete={handleUploadComplete} />
             )}
-
             <Filters
               filters={filters}
               onFilterChange={handleFilterChange}
@@ -452,7 +381,6 @@ function Dashboard({ onLogout, user }) {
               goalValue={goalValue}
               onGoalInputChange={handleGoalInputChange}
             />
-
             {isLoadingData ? (
               <div className="flex-grow flex flex-col items-center justify-center min-h-[400px] text-slate-500 text-lg">
                 <i className="fas fa-spinner fa-spin mr-3"></i> Carregando dados...
@@ -467,7 +395,6 @@ function Dashboard({ onLogout, user }) {
             ) : (
               <>
                 <OperationsOverview currentMetrics={metrics.current} previousMetrics={metrics.previous} />
-
                 <PerformanceMetrics
                   metrics={metrics.current}
                   timeSeriesData={hourlyData}
@@ -475,7 +402,6 @@ function Dashboard({ onLogout, user }) {
                   operatorsList={operatorsList}
                   selectedOperatorId={selectedOperatorId}
                 />
-
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                    <div
                      data-name="metrics-chart-tabulation-distribution"
@@ -498,7 +424,6 @@ function Dashboard({ onLogout, user }) {
                        )}
                      </div>
                    </div>
-
                   <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6 min-h-[450px] flex flex-col">
                     <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
                       <h3 className="text-lg font-semibold text-slate-800 whitespace-nowrap">
@@ -571,7 +496,6 @@ function Dashboard({ onLogout, user }) {
                      </select>
                  </div>
              </div>
-
              <ExhibitionView
                metrics={metricsToday.current}
                previousMetrics={metricsToday.previous}
@@ -585,11 +509,8 @@ function Dashboard({ onLogout, user }) {
                 isLoading={isLoadingData}
                 error={errorData}
             />
-
           </main>
         )}
-
-
     </div>
   );
 }

@@ -1,13 +1,13 @@
 body {
-    background-color: #f1f5f9; /* Updated to slate-100 */
-    color: #1e293b; /* Updated to slate-800 */
-    font-family: Inter, sans-serif; /* Added a default sans-serif font */
+    background-color: #f1f5f9;
+    color: #1e293b;
+    font-family: Inter, sans-serif;
 }
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 .dashboard-container {
-    padding: 24px; /* Adjusted padding */
+    padding: 24px;
     max-width: 1920px;
     margin: 0 auto;
 }

@@ -41,7 +41,7 @@ function BarChart({ data, title, horizontal = false }) {
                         top: 10,
                         right: horizontal ? 20 : 10,
                         bottom: horizontal ? 10 : 30,
-                        left: horizontal ? 20 : 20 // Reduced left padding slightly
+                        left: horizontal ? 20 : 20
                     }
                 },
                 plugins: {
@@ -105,7 +105,7 @@ function BarChart({ data, title, horizontal = false }) {
                         },
                         ticks: {
                             autoSkip: false,
-                            maxRotation: horizontal ? 0 : 45, // Allow rotation for vertical labels
+                            maxRotation: horizontal ? 0 : 45,
                             minRotation: horizontal ? 0 : 45,
                             font: { size: 10 },
                             color: '#475569'

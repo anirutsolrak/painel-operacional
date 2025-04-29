@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggleUpload }) { // Added showUpload and onToggleUpload props
+function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggleUpload }) {
     const displayName = user?.user_metadata?.name || user?.email || '';
 
     return (
@@ -28,23 +28,21 @@ function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggl
                             Olá, {displayName}
                         </span>
 
-                        {/* Botão Exportar - Reintroduzido, desabilitado por padrão */}
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={true} // Desabilitado até a funcionalidade ser implementada
+                            disabled={true}
                             title="Funcionalidade de exportação pendente"
                         >
                              <i className="fas fa-download"></i>
                             <span className="hidden sm:inline">Exportar</span>
                         </motion.button>
 
-                        {/* Botão Upload - Movido para cá e estilizado */}
                         <motion.button
                            whileHover={{ scale: 1.05 }}
                            whileTap={{ scale: 0.95 }}
-                           onClick={onToggleUpload} // Use the passed handler
+                           onClick={onToggleUpload}
                            className={`px-3 py-1.5 ${showUpload ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-green-600 text-white hover:bg-green-700'} rounded-md transition-colors text-sm font-medium flex items-center gap-2`}
                            title={showUpload ? 'Fechar upload' : 'Upload de dados'}
                         >
@@ -52,8 +50,6 @@ function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggl
                            <span className="hidden sm:inline">{showUpload ? 'Fechar' : 'Upload'}</span>
                         </motion.button>
 
-
-                        {/* Botão Modo Exibição - Reintroduzido */}
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}

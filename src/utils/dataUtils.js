@@ -6,9 +6,8 @@ import {
   fetchStateMapData,
   fetchOperators,
   fetchStates,
-  fetchRegions // Import the new fetch function
+  fetchRegions
 } from './supabaseClient';
-
 
 function formatDuration(seconds) {
   if (
@@ -38,7 +37,6 @@ function formatDuration(seconds) {
     return `${paddedMinutes}:${paddedSeconds}`;
   }
 }
-
 
 function formatPercentage(value) {
   if (isNaN(value) || value === null || value === undefined)
@@ -71,7 +69,6 @@ function calculateTrend(current, previous) {
         return { value: '0.0', direction: 'neutral' };
    }
 
-
   const trend = ((current - previous) / previous) * 100;
   if (isNaN(trend)) return { value: null, direction: 'neutral' };
 
@@ -82,13 +79,8 @@ function calculateTrend(current, previous) {
   return { value: Math.abs(trend).toFixed(1), direction: direction };
 }
 
-
 const getPerformanceMetrics = async (filtros = {}) => {
-  console.log("📊 [dataUtils] getPerformanceMetrics called with filters:", filtros);
   const { data: current, previous, error } = await fetchDashboardMetricsWithTrend(filtros);
-
-  console.log("📊 [dataUtils] getPerformanceMetrics raw response:", { current, previous, error });
-
   return {
       current: current || {
            totalLigações: 0,
@@ -119,57 +111,39 @@ const getPerformanceMetrics = async (filtros = {}) => {
 };
 
 const getTimeSeriesData = async (filtros = {}) => {
-   console.log("📊 [dataUtils] getTimeSeriesData called with filters:", filtros);
   const { data, error } = await fetchHourlyCallCounts(filtros);
-    console.log("📊 [dataUtils] getTimeSeriesData raw response:", { data, error });
   return { data: data || [], error: error };
 };
 
 const getStatusDistribution = async (filtros = {}) => {
-   console.log("📊 [dataUtils] getStatusDistribution called with filters:", filtros);
   const { data, error } = await fetchStatusDistribution(filtros);
-    console.log("📊 [dataUtils] getStatusDistribution raw response:", { data, error });
   return { data: data || [], error: error };
 }
 
-
 const getTabulationDistribution = async (filtros = {}) => {
-   console.log("📊 [dataUtils] getTabulationDistribution called with filters:", filtros);
    const { data, error } = await fetchTabulationDistribution(filtros);
-    console.log("📊 [dataUtils] getTabulationDistribution raw response:", { data, error });
    return { data: data || [], error: error };
 };
 
-
 const getStateData = async (filtros = {}) => {
-   console.log("📊 [dataUtils] getStateData called with filters:", filtros);
   const { data, error } = await fetchStateMapData(filtros);
-    console.log("📊 [dataUtils] getStateData raw response:", { data, error });
   return { data: data || [], error: error };
 };
 
 const getOperators = async () => {
-   console.log("📊 [dataUtils] getOperators called.");
   const { data, error } = await fetchOperators();
-    console.log("📊 [dataUtils] getOperators raw response:", { data, error });
   return { data: data || [], error: error };
 };
 
 const getStates = async () => {
-   console.log("📊 [dataUtils] getStates called.");
   const { data, error } = await fetchStates();
-    console.log("📊 [dataUtils] getStates raw response:", { data, error });
   return { data: data || [], error: error };
 };
 
-// New function to get regions
 const getRegions = async () => {
-    console.log("📊 [dataUtils] getRegions called.");
-    const { data, error } = await fetchRegions(); // Call the new fetchRegions function
-    console.log("📊 [dataUtils] getRegions raw response:", { data, error });
+    const { data, error } = await fetchRegions();
     return { data: data || [], error: error };
 };
-
 
 function getDateRangeParams(dateRange) {
     const now = new Date();
@@ -234,14 +208,6 @@ function getDateRangeParams(dateRange) {
             previous_end_date = null;
     }
 
-    console.log("📊 [dataUtils] Calculated Date Range:", {
-        dateRange,
-        current_start_date: current_start_date?.toISOString(),
-        current_end_date: current_end_date?.toISOString(),
-        previous_start_date: previous_start_date?.toISOString(),
-        previous_end_date: previous_end_date?.toISOString(),
-    });
-
     return {
         current_start_date: current_start_date ? current_start_date.toISOString() : null,
         current_end_date: current_end_date ? current_end_date.toISOString() : null,
@@ -250,7 +216,6 @@ function getDateRangeParams(dateRange) {
     };
 }
 
-// Define stateRegions here if it's used by other components or dataUtils functions
 const stateRegions = {
     'AC': 'Norte', 'AM': 'Norte', 'AP': 'Norte', 'PA': 'Norte', 'RO': 'Norte', 'RR': 'Norte', 'TO': 'Norte',
     'AL': 'Nordeste', 'BA': 'Nordeste', 'CE': 'Nordeste', 'MA': 'Nordeste', 'PB': 'Nordeste', 'PE': 'Nordeste', 'PI': 'Nordeste', 'RN': 'Nordeste', 'SE': 'Nordeste',
@@ -258,7 +223,6 @@ const stateRegions = {
     'ES': 'Sudeste', 'MG': 'Sudeste', 'RJ': 'Sudeste', 'SP': 'Sudeste',
     'PR': 'Sul', 'RS': 'Sul', 'SC': 'Sul'
 };
-
 
 const dataUtils = {
   getPerformanceMetrics,
@@ -268,14 +232,14 @@ const dataUtils = {
   getStateData,
   getOperators,
   getStates,
-  getRegions, // Export the new function
+  getRegions,
   getDateRangeParams,
 
   formatDuration,
   formatPercentage,
   calculateTrend,
 
-  stateRegions, // Export stateRegions if needed elsewhere
+  stateRegions,
 };
 
 export default dataUtils;

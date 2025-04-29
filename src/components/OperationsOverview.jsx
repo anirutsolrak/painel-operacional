@@ -35,19 +35,6 @@ const TrendIndicator = ({ trend, lowerIsBetter = false }) => {
 
 
 function OperationsOverview({ currentMetrics, previousMetrics }) {
-    console.log("[OperationsOverview] Rendering with currentMetrics:", currentMetrics, "previousMetrics:", previousMetrics);
-
-   // Remove local calculation for productivity, use tempoPerdidoSegundos directly
-   // const currentProdutividade =
-   //  currentMetrics?.totalLigações > 0
-   //    ? (currentMetrics?.ligaçõesAtendidasCount || 0) / currentMetrics.totalLigações
-   //    : 0;
-   // const previousProdutividade =
-   //   previousMetrics?.totalLigações > 0
-   //     ? (previousMetrics?.ligaçõesAtendidasCount || 0) / previousMetrics.totalLigações
-   //     : 0;
-
-
   const successTrend = dataUtils.calculateTrend(
     currentMetrics?.taxaSucesso,
     previousMetrics?.taxaSucesso
@@ -57,7 +44,6 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
     previousMetrics?.taxaNaoEfetivo
   );
 
-  // Calculate trend for tempoPerdidoSegundos (lower is better)
   const tempoPerdidoTrend = dataUtils.calculateTrend(
       currentMetrics?.tempoPerdidoSegundos,
       previousMetrics?.tempoPerdidoSegundos
@@ -71,10 +57,8 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
 
 
   const formatValue = useCallback((value, formatter) => {
-      if (value === undefined || value === null) return '0'; // Handle null/undefined explicitly
-      // If value is numeric 0 and formatter is percentage, return 0.0%
+      if (value === undefined || value === null) return '0';
       if (value === 0 && formatter === dataUtils.formatPercentage) return '0.0%';
-      // If value is numeric 0 and formatter is duration, return 00:00
       if (value === 0 && formatter === dataUtils.formatDuration) return '00:00';
 
       return formatter && typeof formatter === 'function' ? formatter(value) : value.toLocaleString('pt-BR');
@@ -114,11 +98,9 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
         <div className="text-2xl font-bold text-blue-600">
            {formatValue(currentMetrics?.taxaNaoEfetivo, dataUtils.formatPercentage)}
         </div>
-        {/* Trend for Não Efetivo should be lower is better */}
         <TrendIndicator trend={otherTabTrend} lowerIsBetter={true} />
       </motion.div>
 
-      {/* Card for Tempo Perdido */}
       <motion.div
         whileHover={{ scale: 1.02 }}
         className="bg-white rounded-lg shadow-md border border-slate-200 p-4 transition-all duration-300 hover:shadow-lg"
@@ -133,7 +115,6 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
            ({formatValue(currentMetrics?.ligaçõesFalhaCount)}{' '}
            casos)
         </div>
-         {/* Trend for Tempo Perdido should be lower is better */}
         <TrendIndicator trend={tempoPerdidoTrend} lowerIsBetter={true} />
       </motion.div>
 

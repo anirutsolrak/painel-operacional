@@ -1,7 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import Chart from 'chart.js/auto';
 
-
 function DoughnutChart({
     data,
     title,
@@ -9,7 +8,7 @@ function DoughnutChart({
   }) {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
-  
+
     useEffect(() => {
       if (!data || data.length === 0 || !chartRef.current) {
           if (chartInstance.current) {
@@ -20,15 +19,15 @@ function DoughnutChart({
       }
       const ctx = chartRef.current.getContext('2d');
       if (!ctx) return;
-  
+
       if (chartInstance.current) {
         chartInstance.current.destroy();
         chartInstance.current = null;
       }
-  
+
       const timeoutId = setTimeout(() => {
         if (!chartRef.current) return;
-  
+
         chartInstance.current = new Chart(ctx, {
           type: 'doughnut',
           data: {
@@ -83,7 +82,7 @@ function DoughnutChart({
           },
         });
       }, 600);
-  
+
       return () => {
         clearTimeout(timeoutId);
         if (chartInstance.current) {
@@ -92,12 +91,12 @@ function DoughnutChart({
         }
       };
     }, [data, title, colors]);
-  
+
     if (!data || data.length === 0) {
          return null;
     }
-  
+
     return <canvas ref={chartRef}></canvas>;
   }
 
-  export default DoughnutChart
+  export default DoughnutChart;

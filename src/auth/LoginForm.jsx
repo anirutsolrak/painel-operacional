@@ -114,7 +114,6 @@ export default function LoginForm() {
 
             <div className="mt-6 text-center">
                 <p className="text-slate-600">
-                    {/* Link para cadastro removido pois App.js só renderiza LoginForm agora */}
                 </p>
             </div>
         </motion.div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import getSupabaseClient from '../utils/supabaseClient';
 
-export default function SignupForm() { // onSwitchToLogin prop removed
+export default function SignupForm() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -93,7 +93,6 @@ export default function SignupForm() { // onSwitchToLogin prop removed
                 </motion.div>
             )}
 
-            {/* Renderiza o formulário apenas se não houver uma mensagem de sucesso */}
             {!(message?.type === 'success') && (
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
@@ -162,7 +161,6 @@ export default function SignupForm() { // onSwitchToLogin prop removed
 
             <div className="mt-6 text-center">
                 <p className="text-slate-600">
-                    {/* Link para login removido pois App.js só renderiza LoginForm agora */}
                 </p>
             </div>
         </motion.div>

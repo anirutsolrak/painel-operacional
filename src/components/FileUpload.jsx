@@ -49,7 +49,6 @@ function FileUpload({ onUploadComplete }) {
           );
         }
       } catch (e) {
-        console.warn(`Failed to parse Excel date serial ${dateTimeInput}:`, e);
         dateObj = null;
       }
     }
@@ -87,19 +86,16 @@ function FileUpload({ onUploadComplete }) {
         try {
           dateObj = new Date(Date.UTC(year, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), seconds));
         } catch (e) {
-          console.error(`Error creating Date object from "${dateTimeStr}" with assumed D/M/Y:`, e);
           dateObj = null;
         }
 
         if (!dateObj || isNaN(dateObj.getTime())) {
              if (part1Int <= 12 && part2Int <= 12 && part1Int !== part2Int) {
-                  console.warn(`D/M/Y parsing failed for "${dateTimeStr}". Trying M/D/Y.`);
                   day = part2Int;
                   month = part1Int;
                   try {
                        dateObj = new Date(Date.UTC(year, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), seconds));
                   } catch(e) {
-                        console.error(`Error creating Date object from "${dateTimeStr}" with M/D/Y:`, e);
                         dateObj = null;
                   }
              }
@@ -111,7 +107,6 @@ function FileUpload({ onUploadComplete }) {
     if (dateObj && !isNaN(dateObj.getTime())) {
       return dateObj.toISOString();
     } else {
-      console.warn(`Could not parse date/time: "${dateTimeInput}" (original type: ${typeof dateTimeInput})`);
       return null;
     }
   };
@@ -120,52 +115,41 @@ function FileUpload({ onUploadComplete }) {
     if (timeInput === null || timeInput === undefined || timeInput === '') return null;
 
      if (typeof timeInput === 'number' && timeInput >= 0 && timeInput < 1) {
-         console.log(`timeToSeconds input is number (likely Excel time): ${timeInput}`);
          const secondsInDay = 24 * 60 * 60;
          return Math.round(timeInput * secondsInDay);
      }
 
     let timeStr = String(timeInput).trim();
-    console.log(`timeToSeconds input string: "${timeStr}"`);
-
 
     const durationMatch = timeStr.match(/^(\d+):(\d{2}):(\d{2})$/);
     if (durationMatch) {
-        console.log(`timeToSeconds matched HH:MM:SS format: "${timeStr}"`);
         const [, hoursStr, minutesStr, secondsStr] = durationMatch;
         const h = parseInt(hoursStr, 10);
         const m = parseInt(minutesStr, 10);
         const s = parseInt(secondsStr, 10);
 
          if (isNaN(h) || isNaN(m) || isNaN(s) || h < 0 || m < 0 || m > 59 || s < 0 || s > 59) {
-              console.warn(`Tempo (duração) inválido (componentes fora do intervalo): "${timeInput}"`);
               return null;
          }
 
         const totalSeconds = h * 3600 + m * 60 + s;
-        console.log(`Calculated total seconds from HH:MM:SS: ${totalSeconds}`);
         return totalSeconds;
     }
 
      const minuteDurationMatch = timeStr.match(/^(\d+):(\d{2})$/);
       if (minuteDurationMatch) {
-           console.log(`timeToSeconds matched HH:MM format: "${timeStr}"`);
            const [, hoursStr, minutesStr] = minuteDurationMatch;
            const h = parseInt(hoursStr, 10);
            const m = parseInt(minutesStr, 10);
 
             if (isNaN(h) || isNaN(m) || h < 0 || m < 0 || m > 59) {
-                 console.warn(`Tempo (duração) inválido (componentes fora do intervalo): "${timeInput}"`);
                  return null;
             }
 
            const totalSeconds = h * 3600 + m * 60;
-           console.log(`Calculated total seconds from HH:MM: ${totalSeconds}`);
            return totalSeconds;
       }
 
-
-    console.warn(`Formato de tempo (duração) inválido: "${timeInput}". Did not match HH:MM:SS or HH:MM.`);
     return null;
   };
 
@@ -202,11 +186,6 @@ function FileUpload({ onUploadComplete }) {
           defval: null,
         });
 
-
-        console.log('Raw rows (from raw:true read, first 5):', rowsRaw.slice(0, 5));
-        console.log('Formatted rows (from raw:false read, first 5):', rows.slice(0, 5));
-
-
         if (rows.length < 2) throw new Error('Planilha vazia ou sem dados.');
 
         const headerRow = rows[0].map((h) => h ? String(h).trim() : null);
@@ -226,7 +205,6 @@ function FileUpload({ onUploadComplete }) {
         const missingHeaders = requiredHeaders.filter(h => headerRow.findIndex(hr => normalizeHeader(hr) === normalizeHeader(h)) === -1);
 
         if (missingHeaders.length > 0) {
-          console.error('Header Map:', headerMap);
           throw new Error(`Cabeçalho inválido. Colunas esperadas não encontradas: ${missingHeaders.join(', ')}`);
         }
 
@@ -257,44 +235,21 @@ function FileUpload({ onUploadComplete }) {
             const rawOperator = rawRowFormatted[headerMap.operator_name];
             const rawTabulation = rawRowFormatted[headerMap.tabulation];
 
-             if (index < 5) {
-                 console.log(`--- Processing Row ${rowNum} ---`);
-                 console.log(`Raw Timestamp (Col ${headerMap.call_timestamp}): "${rawTimestamp}" (type: ${typeof rawTimestamp})`);
-                 console.log(`Raw Duration (Mapped Col ${headerMap.duration_seconds}, Formatted): "${rawDurationFormatted}" (type: ${typeof rawDurationFormatted})`);
-                  console.log(`Raw Duration (Mapped Col ${headerMap.duration_seconds}, Raw): "${rawDurationRaw}" (type: ${typeof rawDurationRaw})`);
-                 console.log(`Raw Col B (Index 1, Formatted): "${rawRowFormatted[1]}" (type: ${typeof rawRowFormatted[1]})`);
-                 console.log(`Raw Col D (Index 3, Formatted): "${rawRowFormatted[3]}" (type: ${typeof rawRowFormatted[3]})`);
-                 console.log(`Raw Col B (Index 1, Raw): "${rawRowRaw[1]}" (type: ${typeof rawRowRaw[1]})`);
-                 console.log(`Raw Col D (Index 3, Raw): "${rawRowRaw[3]}" (type: ${typeof rawRowRaw[3]})`);
-
-                 console.log(`Raw CPF/CNPJ (Col ${headerMap.cpf_cnpj}): "${rawCpfCnpj}" (type: ${typeof rawCpfCnpj})`);
-                 console.log(`Raw UF (Col ${headerMap.uf}): "${rawUf}" (type: ${typeof rawUf})`);
-                 console.log(`Raw User Group (Col ${headerMap.user_group}): "${rawUserGroup}" (type: ${typeof rawUserGroup})`);
-                 console.log(`Raw Operator (Col ${headerMap.operator_name}): "${rawOperator}" (type: ${typeof rawOperator})`);
-                 console.log(`Raw Tabulation (Col ${headerMap.tabulation}): "${rawTabulation}" (type: ${typeof rawTabulation})`);
-             }
-
-
             record.call_timestamp = parseFlexibleDateTime(rawTimestamp);
             if (record.call_timestamp === null) {
               rowErrors.push(`Data/Hora inválida ("${rawTimestamp}")`);
               rowHasError = true;
             }
-             if (index < 5) console.log(`Parsed Timestamp: ${record.call_timestamp}`);
-
 
             let parsedDuration = null;
             if (typeof rawDurationRaw === 'number' && rawDurationRaw >= 0 && rawDurationRaw < 1) {
                 const secondsInDay = 24 * 60 * 60;
                 parsedDuration = Math.round(rawDurationRaw * secondsInDay);
-                 console.log(`Parsed duration from raw number: ${parsedDuration}`);
             } else {
                  parsedDuration = timeToSeconds(rawDurationFormatted);
-                 console.log(`Parsed duration from formatted string: ${parsedDuration}`);
             }
 
             record.duration_seconds = parsedDuration;
-
 
             if (record.duration_seconds === null) {
                  rowErrors.push(`Duração inválida ("${rawDurationFormatted}" / raw: ${rawDurationRaw})`);
@@ -303,22 +258,12 @@ function FileUpload({ onUploadComplete }) {
                  rowErrors.push(`Duração negativa ("${rawDurationFormatted}" / raw: ${rawDurationRaw})`);
                  rowHasError = true;
             }
-             if (index < 5) console.log(`Final Parsed Duration: ${record.duration_seconds}`);
-
 
             record.cpf_cnpj = rawCpfCnpj ? String(rawCpfCnpj).trim() : null;
             record.uf = rawUf ? String(rawUf).trim().toUpperCase() : null;
             record.user_group = rawUserGroup ? String(rawUserGroup).trim() : null;
             record.operator_name = rawOperator ? String(rawOperator).trim() : null;
             record.tabulation = rawTabulation ? String(rawTabulation).trim() : null;
-
-             if (index < 5) {
-                 console.log(`Processed CPF/CNPJ: "${record.cpf_cnpj}"`);
-                 console.log(`Processed UF: "${record.uf}"`);
-                 console.log(`Processed User Group: "${record.user_group}"`);
-                 console.log(`Processed Operator: "${record.operator_name}"`);
-                 console.log(`Processed Tabulation: "${record.tabulation}"`);
-             }
 
              if (!record.uf) {
                  rowErrors.push(`UF ausente.`);
@@ -338,22 +283,13 @@ function FileUpload({ onUploadComplete }) {
              }
 
             if (rowHasError) {
-                 console.error(`Row ${rowNum} validation failed. Errors:`, rowErrors);
                 validationErrors.push(`Linha ${rowNum}: ${rowErrors.join(', ')}`);
                  return null;
             } else {
-                 if (index < 5) console.log(`Row ${rowNum} valid.`);
                  return record;
             }
           })
           .filter((record) => record !== null);
-
-        console.log(
-          'Transformed data for insertion (first 5 valid):',
-          transformedData.slice(0, 5)
-        );
-         console.log(`Total valid rows for insertion: ${transformedData.length}`);
-
 
         if (transformedData.length === 0 && validationErrors.length === 0) {
           throw new Error('Nenhum dado válido encontrado no arquivo.');
@@ -397,7 +333,6 @@ function FileUpload({ onUploadComplete }) {
                throw error;
           }
 
-
           const successMessage = `${validRowsCount} registros importados com sucesso!`;
           const summaryMessage = validationErrors.length > 0
               ? `${successMessage} (${ignoredRowsCount} inválidos ignorados).`
@@ -415,7 +350,6 @@ function FileUpload({ onUploadComplete }) {
             });
         }
 
-
         setSelectedFile(null);
         if (document.getElementById('file-upload-input')) {
           document.getElementById('file-upload-input').value = null;
@@ -424,7 +358,6 @@ function FileUpload({ onUploadComplete }) {
           onUploadComplete();
         }
       } catch (err) {
-        console.error('Erro durante o upload:', err);
         if (!message.text.includes('Erro:')) {
              setMessage({ text: `Erro: ${err.message}`, type: 'error' });
         } else if (message.type !== 'error') {
@@ -435,8 +368,7 @@ function FileUpload({ onUploadComplete }) {
       }
     };
     reader.readAsArrayBuffer(selectedFile);
-  }, [selectedFile, onUploadComplete, message.text, message.type]);
-
+  }, [selectedFile, onUploadComplete]);
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-md border border-slate-200 mb-6">
