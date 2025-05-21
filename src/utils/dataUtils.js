@@ -47,27 +47,27 @@ function formatPercentage(value) {
 }
 
 function calculateTrend(current, previous) {
-   if (
-      previous === undefined ||
-      previous === null ||
-      isNaN(current) ||
-      isNaN(previous) ||
-      current === null ||
-      previous === null
-   ) {
-       return { value: null, direction: 'neutral' };
-   }
-   if (previous === 0) {
-       if (current > 0) return { value: '∞', direction: 'up' };
-       if (current < 0) return { value: '-∞', direction: 'down' };
-       return { value: '0.0', direction: 'neutral' };
-   }
+  if (
+    previous === undefined ||
+    previous === null ||
+    isNaN(current) ||
+    isNaN(previous) ||
+    current === null ||
+    previous === null
+  ) {
+    return { value: null, direction: 'neutral' };
+  }
+  if (previous === 0) {
+    if (current > 0) return { value: '∞', direction: 'up' };
+    if (current < 0) return { value: '-∞', direction: 'down' };
+    return { value: '0.0', direction: 'neutral' };
+  }
 
-   if (current === 0) {
-        if (previous > 0) return { value: '∞', direction: 'down' };
-        if (previous < 0) return { value: '-∞', direction: 'up' };
-        return { value: '0.0', direction: 'neutral' };
-   }
+  if (current === 0) {
+    if (previous > 0) return { value: '∞', direction: 'down' };
+    if (previous < 0) return { value: '-∞', direction: 'up' };
+    return { value: '0.0', direction: 'neutral' };
+  }
 
   const trend = ((current - previous) / previous) * 100;
   if (isNaN(trend)) return { value: null, direction: 'neutral' };
@@ -79,149 +79,115 @@ function calculateTrend(current, previous) {
   return { value: Math.abs(trend).toFixed(1), direction: direction };
 }
 
-const getPerformanceMetrics = async (filtros = {}) => {
-  const { data: current, previous, error } = await fetchDashboardMetricsWithTrend(filtros);
-  return {
-      current: current || {
-           totalLigações: 0,
-           ligaçõesAtendidasCount: 0,
-           ligaçõesAbandonadasCount: 0,
-           ligaçõesFalhaCount: 0,
-           tma: 0,
-           taxaSucesso: 0,
-           taxaNaoEfetivo: 0,
-           sucessoTabulacoesCount: 0,
-           taxaAbandono: 0,
-           tempoPerdidoSegundos: 0
-      },
-      previous: previous || {
-           totalLigações: 0,
-           ligaçõesAtendidasCount: 0,
-           ligaçõesAbandonadasCount: 0,
-           ligaçõesFalhaCount: 0,
-           tma: 0,
-           taxaSucesso: 0,
-           taxaNaoEfetivo: 0,
-           sucessoTabulacoesCount: 0,
-           taxaAbandono: 0,
-           tempoPerdidoSegundos: 0
-      },
-      error: error
-  };
-};
+function getDateRangeParams(dateRange, customStartDate = null, customEndDate = null) {
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
 
-const getTimeSeriesData = async (filtros = {}) => {
-  const { data, error } = await fetchHourlyCallCounts(filtros);
-  return { data: data || [], error: error };
-};
+  let current_start_date;
+  let current_end_date = new Date(now);
+  let previous_start_date;
+  let previous_end_date;
 
-const getStatusDistribution = async (filtros = {}) => {
-  const { data, error } = await fetchStatusDistribution(filtros);
-  return { data: data || [], error: error };
-}
+  if (dateRange === 'custom' && customStartDate && customEndDate) {
+    current_start_date = new Date(customStartDate);
+    current_end_date = new Date(customEndDate);
+    current_end_date.setHours(23, 59, 59, 999);
 
-const getTabulationDistribution = async (filtros = {}) => {
-   const { data, error } = await fetchTabulationDistribution(filtros);
-   return { data: data || [], error: error };
-};
-
-const getStateData = async (filtros = {}) => {
-  const { data, error } = await fetchStateMapData(filtros);
-  return { data: data || [], error: error };
-};
-
-const getOperators = async () => {
-  const { data, error } = await fetchOperators();
-  return { data: data || [], error: error };
-};
-
-const getStates = async () => {
-  const { data, error } = await fetchStates();
-  return { data: data || [], error: error };
-};
-
-const getRegions = async () => {
-    const { data, error } = await fetchRegions();
-    return { data: data || [], error: error };
-};
-
-function getDateRangeParams(dateRange) {
-    const now = new Date();
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-
-    let current_start_date;
-    let current_end_date = new Date(now);
-
-    let previous_start_date;
-    let previous_end_date;
-
+    const daysDiff = Math.ceil((current_end_date - current_start_date) / (1000 * 60 * 60 * 24));
+    
+    previous_start_date = new Date(current_start_date);
+    previous_start_date.setDate(previous_start_date.getDate() - daysDiff);
+    
+    previous_end_date = new Date(current_start_date);
+    previous_end_date.setDate(previous_end_date.getDate() - 1);
+    previous_end_date.setHours(23, 59, 59, 999);
+  } else {
     switch (dateRange) {
-        case 'today':
-            current_start_date = new Date(today);
-            current_end_date = new Date(today);
-            current_end_date.setHours(23, 59, 59, 999);
-            previous_start_date = new Date(today);
-            previous_start_date.setDate(today.getDate() - 1);
-            previous_end_date = new Date(previous_start_date);
-            previous_end_date.setHours(23, 59, 59, 999);
-            break;
-        case 'yesterday':
-             const yesterday = new Date(today);
-             yesterday.setDate(today.getDate() - 1);
-             current_start_date = new Date(yesterday);
-             current_end_date = new Date(yesterday);
-             current_end_date.setHours(23, 59, 59, 999);
-             previous_start_date = new Date(yesterday);
-             previous_start_date.setDate(yesterday.getDate() - 1);
-             previous_end_date = new Date(previous_start_date);
-             previous_end_date.setHours(23, 59, 59, 999);
-            break;
-        case 'week':
-            const startOfWeek = new Date(today);
-            startOfWeek.setDate(today.getDate() - 6);
-            current_start_date = new Date(startOfWeek);
-            current_end_date = new Date(today);
-            current_end_date.setHours(23, 59, 59, 999);
-            previous_start_date = new Date(startOfWeek);
-            previous_start_date.setDate(startOfWeek.getDate() - 7);
-            previous_end_date = new Date(startOfWeek);
-            previous_end_date.setDate(startOfWeek.getDate() - 1);
-            previous_end_date.setHours(23, 59, 59, 999);
-            break;
-        case 'month':
-            const startOfMonth = new Date(today);
-            startOfMonth.setDate(today.getDate() - 29);
-            current_start_date = new Date(startOfMonth);
-            current_end_date = new Date(today);
-            current_end_date.setHours(23, 59, 59, 999);
-             previous_start_date = new Date(startOfMonth);
-             previous_start_date.setDate(startOfMonth.getDate() - 30);
-             previous_end_date = new Date(startOfMonth);
-             previous_end_date.setDate(startOfMonth.getDate() - 1);
-             previous_end_date.setHours(23, 59, 59, 999);
-            break;
-        default:
-            current_start_date = null;
-            current_end_date = null;
-            previous_start_date = null;
-            previous_end_date = null;
+      case 'today':
+        current_start_date = new Date(today);
+        current_end_date = new Date(today);
+        current_end_date.setHours(23, 59, 59, 999);
+        previous_start_date = new Date(today);
+        previous_start_date.setDate(today.getDate() - 1);
+        previous_end_date = new Date(previous_start_date);
+        previous_end_date.setHours(23, 59, 59, 999);
+        break;
+      case 'yesterday':
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        current_start_date = new Date(yesterday);
+        current_end_date = new Date(yesterday);
+        current_end_date.setHours(23, 59, 59, 999);
+        previous_start_date = new Date(yesterday);
+        previous_start_date.setDate(yesterday.getDate() - 1);
+        previous_end_date = new Date(previous_start_date);
+        previous_end_date.setHours(23, 59, 59, 999);
+        break;
+      case 'week':
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - 6);
+        current_start_date = new Date(startOfWeek);
+        current_end_date = new Date(today);
+        current_end_date.setHours(23, 59, 59, 999);
+        previous_start_date = new Date(startOfWeek);
+        previous_start_date.setDate(startOfWeek.getDate() - 7);
+        previous_end_date = new Date(startOfWeek);
+        previous_end_date.setDate(startOfWeek.getDate() - 1);
+        previous_end_date.setHours(23, 59, 59, 999);
+        break;
+      case 'month':
+        const startOfMonth = new Date(today);
+        startOfMonth.setDate(today.getDate() - 29);
+        current_start_date = new Date(startOfMonth);
+        current_end_date = new Date(today);
+        current_end_date.setHours(23, 59, 59, 999);
+        previous_start_date = new Date(startOfMonth);
+        previous_start_date.setDate(startOfMonth.getDate() - 30);
+        previous_end_date = new Date(startOfMonth);
+        previous_end_date.setDate(startOfMonth.getDate() - 1);
+        previous_end_date.setHours(23, 59, 59, 999);
+        break;
+      default:
+        // Default to today if no valid date range is provided
+        current_start_date = new Date(today);
+        current_end_date = new Date(today);
+        current_end_date.setHours(23, 59, 59, 999);
+        previous_start_date = new Date(today);
+        previous_start_date.setDate(today.getDate() - 1);
+        previous_end_date = new Date(previous_start_date);
+        previous_end_date.setHours(23, 59, 59, 999);
     }
+  }
 
-    return {
-        current_start_date: current_start_date ? current_start_date.toISOString() : null,
-        current_end_date: current_end_date ? current_end_date.toISOString() : null,
-        previous_start_date: previous_start_date ? previous_start_date.toISOString() : null,
-        previous_end_date: previous_end_date ? previous_end_date.toISOString() : null,
-    };
+  return {
+    current_start_date: current_start_date ? current_start_date.toISOString() : '',
+    current_end_date: current_end_date ? current_end_date.toISOString() : '',
+    previous_start_date: previous_start_date ? previous_start_date.toISOString() : '',
+    previous_end_date: previous_end_date ? previous_end_date.toISOString() : '',
+  };
 }
 
 const stateRegions = {
-    'AC': 'Norte', 'AM': 'Norte', 'AP': 'Norte', 'PA': 'Norte', 'RO': 'Norte', 'RR': 'Norte', 'TO': 'Norte',
-    'AL': 'Nordeste', 'BA': 'Nordeste', 'CE': 'Nordeste', 'MA': 'Nordeste', 'PB': 'Nordeste', 'PE': 'Nordeste', 'PI': 'Nordeste', 'RN': 'Nordeste', 'SE': 'Nordeste',
-    'DF': 'Centro-Oeste', 'GO': 'Centro-Oeste', 'MS': 'Centro-Oeste', 'MT': 'Centro-Oeste',
-    'ES': 'Sudeste', 'MG': 'Sudeste', 'RJ': 'Sudeste', 'SP': 'Sudeste',
-    'PR': 'Sul', 'RS': 'Sul', 'SC': 'Sul'
+  'AC': 'Norte', 'AM': 'Norte', 'AP': 'Norte', 'PA': 'Norte', 'RO': 'Norte', 'RR': 'Norte', 'TO': 'Norte',
+  'AL': 'Nordeste', 'BA': 'Nordeste', 'CE': 'Nordeste', 'MA': 'Nordeste', 'PB': 'Nordeste', 'PE': 'Nordeste', 'PI': 'Nordeste', 'RN': 'Nordeste', 'SE': 'Nordeste',
+  'DF': 'Centro-Oeste', 'GO': 'Centro-Oeste', 'MS': 'Centro-Oeste', 'MT': 'Centro-Oeste',
+  'ES': 'Sudeste', 'MG': 'Sudeste', 'RJ': 'Sudeste', 'SP': 'Sudeste',
+  'PR': 'Sul', 'RS': 'Sul', 'SC': 'Sul'
+};
+
+// Define the missing functions by mapping them to the imported functions
+const getPerformanceMetrics = fetchDashboardMetricsWithTrend;
+const getTimeSeriesData = fetchHourlyCallCounts;
+const getStatusDistribution = fetchStatusDistribution;
+const getTabulationDistribution = fetchTabulationDistribution;
+const getStateData = fetchStateMapData;
+const getOperators = fetchOperators;
+const getStates = fetchStates;
+const getRegions = () => {
+  // Return unique regions in a specific order
+  const uniqueRegions = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
+  return Promise.resolve({ data: uniqueRegions, error: null });
 };
 
 const dataUtils = {
@@ -234,11 +200,9 @@ const dataUtils = {
   getStates,
   getRegions,
   getDateRangeParams,
-
   formatDuration,
   formatPercentage,
   calculateTrend,
-
   stateRegions,
 };
 
