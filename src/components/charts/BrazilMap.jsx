@@ -1,15 +1,6 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import * as d3 from 'd3';
-import * as topojson from 'topojson-client';
 import dataUtils from '../../utils/dataUtils';
-
-const stateRegions = {
-    'AC': 'Norte', 'AM': 'Norte', 'AP': 'Norte', 'PA': 'Norte', 'RO': 'Norte', 'RR': 'Norte', 'TO': 'Norte',
-    'AL': 'Nordeste', 'BA': 'Nordeste', 'CE': 'Nordeste', 'MA': 'Nordeste', 'PB': 'Paraíba', 'PE': 'Pernambuco', 'PI': 'Piauí', 'RN': 'Rio Grande do Norte', 'SE': 'Sergipe',
-    'GO': 'Centro-Oeste', 'MT': 'Centro-Oeste', 'MS': 'Centro-Oeste', 'DF': 'Centro-Oeste',
-    'ES': 'Sudeste', 'MG': 'Sudeste', 'RJ': 'Sudeste', 'SP': 'Sudeste',
-    'PR': 'Sul', 'SC': 'Sul', 'RS': 'Sul'
-};
 
 function BrazilMap({
   data,
@@ -17,6 +8,7 @@ function BrazilMap({
   selectedMetric = 'totalLigações',
   metricOptions,
   selectedMapRegion = 'all',
+  ufRegionsData
 }) {
   const mapRef = useRef(null);
   const tooltipRef = useRef(null);
@@ -30,6 +22,15 @@ function BrazilMap({
   const [geoJsonData, setGeoJsonData] = useState(null);
   const [loadingGeoJson, setLoadingGeoJson] = useState(true);
   const [errorGeoJson, setErrorGeoJson] = useState(null);
+
+  const ufToRegionMap = useMemo(() => {
+      if (!ufRegionsData || ufRegionsData.length === 0) return {};
+      return ufRegionsData.reduce((acc, item) => {
+          acc[item.uf] = item.region_name;
+          return acc;
+      }, {});
+  }, [ufRegionsData]);
+
 
   useEffect(() => {
     const geoJsonUrl =
@@ -47,11 +48,9 @@ function BrazilMap({
         if (!json || !json.features) {
           throw new Error("GeoJSON inválido ou não contém 'features'.");
         }
-
         json.features.forEach((feature) => {
           if (feature.properties && feature.properties.sigla) {
             feature.properties.centroid = d3.geoCentroid(feature);
-             feature.properties.region = stateRegions[feature.properties.sigla] || 'Desconhecida';
           }
         });
         setGeoJsonData(json);
@@ -70,6 +69,7 @@ function BrazilMap({
     fetchGeoJson();
   }, []);
 
+
   useEffect(() => {
     const stateMetrics = data || {};
     const svg = d3.select(mapRef.current);
@@ -77,22 +77,19 @@ function BrazilMap({
     svg.selectAll('*').remove();
     legendSvg.selectAll('*').remove();
 
-    if (loadingGeoJson || !geoJsonData || errorGeoJson) {
+    if (loadingGeoJson || !geoJsonData || errorGeoJson || !ufToRegionMap) {
       return;
     }
 
     try {
       const metricAccessor = (d) => d?.[selectedMetric];
-
       const metricValues = Object.keys(stateMetrics)
         .map((stateKey) => metricAccessor(stateMetrics[stateKey]))
         .filter((value) => typeof value === 'number' && !isNaN(value));
-
       let minMetricValue =
         metricValues.length > 0 ? d3.min(metricValues) : 0;
       let maxMetricValue =
         metricValues.length > 0 ? d3.max(metricValues) : 1;
-
       if (minMetricValue === maxMetricValue) {
         if (maxMetricValue !== 0) {
           minMetricValue = maxMetricValue * 0.9;
@@ -105,18 +102,13 @@ function BrazilMap({
        if (minMetricValue === maxMetricValue) {
            maxMetricValue = minMetricValue + (minMetricValue === 0 ? 1 : Math.abs(minMetricValue) * 0.1);
        }
-
       const colorInterpolator = selectedMetric === 'taxaSucesso' ? d3.interpolateGreens :
                                 selectedMetric === 'taxaAbandono' || selectedMetric === 'taxaNaoEfetivo' ? d3.interpolateReds :
                                 d3.interpolateBlues;
-
       const higherIsBetter = selectedMetric === 'taxaSucesso' || selectedMetric === 'totalLigações';
-
       const colorScale = d3
         .scaleSequential(colorInterpolator)
         .domain(higherIsBetter ? [minMetricValue, maxMetricValue] : [maxMetricValue, minMetricValue]);
-
-
       const width = 960,
         height = 600;
       const projection = d3
@@ -124,39 +116,31 @@ function BrazilMap({
         .center([-52, -14])
         .scale(850)
         .translate([width / 2, height / 2]);
-
       const path = d3.geoPath().projection(projection);
-
       svg
         .attr('viewBox', `0 0 ${width} ${height}`)
         .attr('preserveAspectRatio', 'xMidYMid meet')
         .style('max-height', displayMode === 'navigation' ? '500px' : 'auto');
-
       const mapGroup = svg.append('g');
       const textGroup = svg.append('g').attr('class', 'state-labels');
-
       geoJsonData.features.forEach((feature) => {
         const stateAbbr = feature.properties.sigla;
         const stateName = feature.properties.name;
         const centroid = feature.properties.centroid
           ? projection(feature.properties.centroid)
           : null;
-        const geojsonRegion = feature.properties.region;
+        const featureRegion = ufToRegionMap[stateAbbr] || 'Desconhecida';
 
         if (!stateAbbr) {
             return;
         }
-
         const stateInfo = stateMetrics[stateAbbr];
         const metricValue = stateInfo ? metricAccessor(stateInfo) : undefined;
-
-        const isHighlighted = selectedMapRegion === 'all' || (geojsonRegion && selectedMapRegion === geojsonRegion);
-
+        const isHighlighted = selectedMapRegion === 'all' || (featureRegion && selectedMapRegion === featureRegion);
         let fillColor = '#E5E7EB';
         let strokeColor = '#FFFFFF';
         let strokeWidth = 0.5;
         let fillOpacity = 1;
-
         if (stateInfo && metricValue !== undefined && metricValue !== null && typeof metricValue === 'number' && !isNaN(metricValue)) {
             try {
                 fillColor = colorScale(metricValue);
@@ -173,7 +157,6 @@ function BrazilMap({
         } else {
             fillColor = '#CBD5E1';
         }
-
         if (isHighlighted && displayMode === 'navigation') {
            strokeColor = '#0f172a';
            strokeWidth = 1.5;
@@ -183,7 +166,6 @@ function BrazilMap({
            strokeColor = '#FFFFFF';
            strokeWidth = 0.5;
         }
-
         mapGroup
           .append('path')
           .datum(feature)
@@ -203,7 +185,6 @@ function BrazilMap({
             'fill 0.2s, stroke 0.2s, stroke-width 0.2s, fill-opacity 0.2s'
           )
            .order()
-
           .on(
             'mouseover',
             (displayMode === 'navigation' && isHighlighted)
@@ -211,11 +192,9 @@ function BrazilMap({
                      d3.select(event.currentTarget)
                        .attr('stroke-width', 2.5)
                        .attr('stroke', '#000');
-
                   let tooltipContent = stateInfo
                     ? `${stateName} (${stateAbbr})<br/>Total Ligações: ${stateInfo.totalLigações !== undefined && stateInfo.totalLigações !== null ? stateInfo.totalLigações.toLocaleString('pt-BR') : 'N/A'}<br/>Taxa Sucesso: ${stateInfo.taxaSucesso !== undefined && stateInfo.taxaSucesso !== null ? dataUtils.formatPercentage(stateInfo.taxaSucesso) : 'N/A'}`
                     : `${stateName} (${stateAbbr}): Sem dados`;
-
                   setTooltip({
                     show: true,
                     content: tooltipContent,
@@ -230,16 +209,14 @@ function BrazilMap({
             (displayMode === 'navigation' && isHighlighted)
               ? (event) => {
                   setTooltip({ show: false, content: '', x: 0, y: 0 });
-                   const originalStrokeWidth = (selectedMapRegion !== 'all' && displayMode === 'navigation' && selectedMapRegion === geojsonRegion) ? 1.5 : 0.5;
-                   const originalStrokeColor = (selectedMapRegion !== 'all' && displayMode === 'navigation' && selectedMapRegion === geojsonRegion) ? '#0f172a' : '#FFFFFF';
-
+                   const originalStrokeWidth = (selectedMapRegion !== 'all' && displayMode === 'navigation' && selectedMapRegion === featureRegion) ? 1.5 : 0.5;
+                   const originalStrokeColor = (selectedMapRegion !== 'all' && displayMode === 'navigation' && selectedMapRegion === featureRegion) ? '#0f172a' : '#FFFFFF';
                    d3.select(event.currentTarget)
                      .attr('stroke-width', originalStrokeWidth)
                      .attr('stroke', originalStrokeColor);
                 }
               : null
           );
-
         if (centroid) {
           textGroup
             .append('text')
@@ -256,13 +233,11 @@ function BrazilMap({
             .raise();
         }
       });
-
       const legendHeight = 12;
       const legendWidth = 180;
       const legendGroup = legendSvg
         .append('g')
         .attr('transform', `translate(10, 8)`);
-
       const defs = legendSvg.append('defs');
       const safeMetricName = selectedMetric ? selectedMetric.replace(/[^a-zA-Z0-9]/g, '_') : 'metric';
       const linearGradientId = `map-gradient-${safeMetricName}-${Date.now()}`;
@@ -273,15 +248,12 @@ function BrazilMap({
         .attr('y1', '0%')
         .attr('x2', '100%')
         .attr('y2', '0%');
-
       const colorScaleForGradient = d3.scaleSequential(colorInterpolator)
           .domain(higherIsBetter ? [0, 1] : [1, 0]);
-
       const gradientStops = d3.range(0, 1.01, 0.05).map(t => ({
            offset: `${t * 100}%`,
            color: colorScaleForGradient(t)
       }));
-
       linearGradient
         .selectAll('stop')
         .data(gradientStops)
@@ -289,7 +261,6 @@ function BrazilMap({
         .append('stop')
         .attr('offset', (d) => d.offset)
         .attr('stop-color', (d) => d.color);
-
       legendGroup
         .append('rect')
         .attr('x', 0)
@@ -299,7 +270,6 @@ function BrazilMap({
         .style('fill', `url(#${linearGradientId})`)
         .attr('rx', 2)
         .attr('ry', 2);
-
       const formatLegendValue = (value) => {
         if (typeof value !== 'number' || isNaN(value)) return '-';
         if (selectedMetric === 'taxaSucesso' || selectedMetric === 'taxaAbandono' || selectedMetric === 'taxaNaoEfetivo') {
@@ -309,10 +279,8 @@ function BrazilMap({
         if (value >= 1000) return (value / 1000).toFixed(0) + 'k';
         return Math.round(value).toLocaleString('pt-BR');
       };
-
       const legendMinLabel = formatLegendValue(minMetricValue);
       const legendMaxLabel = formatLegendValue(maxMetricValue);
-
       const valueLabelY = legendHeight + 10;
       legendGroup
         .append('text')
@@ -329,9 +297,7 @@ function BrazilMap({
         .attr('fill', '#475569')
         .attr('text-anchor', 'end')
         .text(formatLegendValue(higherIsBetter ? maxMetricValue : minMetricValue));
-
         const legendTitleText = metricOptions?.find(opt => opt.value === selectedMetric)?.label || 'Métrica';
-
       legendGroup
         .append('text')
         .attr('x', legendWidth / 2)
@@ -341,7 +307,6 @@ function BrazilMap({
         .attr('fill', '#1e293b')
         .attr('text-anchor', 'middle')
         .text(legendTitleText);
-
     } catch (error) {
       console.error('📍🗺️ [BrazilMap Effect] Erro ao renderizar D3:', error);
       setErrorGeoJson('Erro ao desenhar o mapa.');
@@ -354,7 +319,8 @@ function BrazilMap({
     displayMode,
     selectedMetric,
     selectedMapRegion,
-    metricOptions
+    metricOptions,
+    ufToRegionMap
   ]);
 
    const handleMouseMove = useCallback((event) => {
@@ -382,7 +348,6 @@ function BrazilMap({
           <span className="block mt-1">{errorGeoJson}</span>
         </div>
       )}
-
       {!loadingGeoJson && !errorGeoJson && geoJsonData && (
         <>
           <div className="flex-grow relative w-full max-w-[600px]">
@@ -401,7 +366,6 @@ function BrazilMap({
           )}
         </>
       )}
-
        {displayMode === 'navigation' && tooltip.show && (
         <div
           ref={tooltipRef}

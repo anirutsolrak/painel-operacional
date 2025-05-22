@@ -7,13 +7,11 @@ function BarChart({ data, title, horizontal = false }) {
 
     const chartConfig = useMemo(() => {
         if (!data || data.length === 0) return null;
-
         const values = data.map(d => d.value);
         const maxValue = values.length > 0 ? Math.max(...values) : 0;
         const axisMax = maxValue === 0 ? 1 : Math.ceil(maxValue * 1.1) + (maxValue < 10 && maxValue > 0 ? 2 : (maxValue > 0 ? 5 : 0));
         const indexAxis = horizontal ? 'y' : 'x';
         const valueAxis = horizontal ? 'x' : 'y';
-
         return {
             type: 'bar',
             data: {
@@ -124,16 +122,12 @@ function BarChart({ data, title, horizontal = false }) {
              }
             return;
         }
-
         const ctx = chartRef.current.getContext('2d');
         if (!ctx) return;
-
         if (chartInstance.current) {
             chartInstance.current.destroy();
         }
-
         chartInstance.current = new Chart(ctx, chartConfig);
-
         return () => {
             if (chartInstance.current) {
                 chartInstance.current.destroy();

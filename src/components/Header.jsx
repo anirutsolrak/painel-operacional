@@ -1,9 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-
 function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggleUpload }) {
     const displayName = user?.user_metadata?.name || user?.email || '';
-
     return (
         <motion.div
             initial={{ y: -20, opacity: 0 }}
@@ -21,13 +19,12 @@ function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggl
                             transition={{ duration: 0.5 }}
                             className="fas fa-chart-line text-blue-600 text-2xl mr-3"
                         />
-                        <h1 className="text-xl font-semibold text-slate-900">Painel de Análise Call Center</h1>
+                        <h1 className="text-xl font-semibold text-slate-900">Painel de Análise Logistica</h1>
                     </div>
                     <div data-name="header-actions" className="flex items-center space-x-2 sm:space-x-3">
                         <span className="text-sm text-slate-600 hidden sm:inline-block">
                             Olá, {displayName}
                         </span>
-
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
@@ -38,7 +35,6 @@ function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggl
                              <i className="fas fa-download"></i>
                             <span className="hidden sm:inline">Exportar</span>
                         </motion.button>
-
                         <motion.button
                            whileHover={{ scale: 1.05 }}
                            whileTap={{ scale: 0.95 }}
@@ -49,7 +45,6 @@ function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggl
                            <i className={`fas ${showUpload ? 'fa-times' : 'fa-upload'}`}></i>
                            <span className="hidden sm:inline">{showUpload ? 'Fechar' : 'Upload'}</span>
                         </motion.button>
-
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
@@ -59,7 +54,6 @@ function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggl
                             <i className={`fas ${displayMode === 'navigation' ? 'fa-tv' : 'fa-mouse-pointer'}`}></i>
                             <span className="hidden sm:inline">{displayMode === 'navigation' ? "Modo Exibição" : "Modo Navegação"}</span>
                         </motion.button>
-
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
@@ -75,5 +69,4 @@ function Header({ displayMode, onToggleMode, onLogout, user, showUpload, onToggl
         </motion.div>
     );
 }
-
 export default Header;

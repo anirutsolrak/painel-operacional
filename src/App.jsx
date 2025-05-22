@@ -17,14 +17,12 @@ function App() {
             console.error("[Auth Effect] Error getting initial session:", error);
             setLoadingAuth(false);
         });
-
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (_event === 'SIGNED_OUT') {
                  setSession(null);
             }
             setSession(session);
         });
-
         return () => subscription.unsubscribe();
     }, [supabase]);
 

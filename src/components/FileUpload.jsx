@@ -29,10 +29,8 @@ function FileUpload({ onUploadComplete }) {
 
   const parseFlexibleDateTime = (dateTimeInput) => {
     if (dateTimeInput === null || dateTimeInput === undefined || dateTimeInput === '') return null;
-
     let dateTimeStr = String(dateTimeInput).trim();
     let dateObj = null;
-
     if (typeof dateTimeInput === 'number' && dateTimeInput > 1) {
       try {
         dateObj = XLSX.SSF.parse_date_code(dateTimeInput, { date1904: false });
@@ -52,7 +50,6 @@ function FileUpload({ onUploadComplete }) {
         dateObj = null;
       }
     }
-
     if (!dateObj || isNaN(dateObj.getTime())) {
       const match = dateTimeStr.match(
         /^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2}|\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
@@ -60,18 +57,15 @@ function FileUpload({ onUploadComplete }) {
       if (match) {
         let [, part1, part2, year, hours, minutes, seconds] = match;
         seconds = seconds ? parseInt(seconds, 10) : 0;
-
         let day, month;
         const yearInt = parseInt(year, 10);
         const part1Int = parseInt(part1, 10);
         const part2Int = parseInt(part2, 10);
-
         if (yearInt < 100) {
              year = 2000 + yearInt;
         } else {
              year = yearInt;
         }
-
         if (part1Int > 12 && part2Int <= 12) {
             day = part1Int;
             month = part2Int;
@@ -82,13 +76,11 @@ function FileUpload({ onUploadComplete }) {
             day = part1Int;
             month = part2Int;
         }
-
         try {
           dateObj = new Date(Date.UTC(year, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), seconds));
         } catch (e) {
           dateObj = null;
         }
-
         if (!dateObj || isNaN(dateObj.getTime())) {
              if (part1Int <= 12 && part2Int <= 12 && part1Int !== part2Int) {
                   day = part2Int;
@@ -100,10 +92,8 @@ function FileUpload({ onUploadComplete }) {
                   }
              }
         }
-
       }
     }
-
     if (dateObj && !isNaN(dateObj.getTime())) {
       return dateObj.toISOString();
     } else {
@@ -113,43 +103,34 @@ function FileUpload({ onUploadComplete }) {
 
   const timeToSeconds = (timeInput) => {
     if (timeInput === null || timeInput === undefined || timeInput === '') return null;
-
      if (typeof timeInput === 'number' && timeInput >= 0 && timeInput < 1) {
          const secondsInDay = 24 * 60 * 60;
          return Math.round(timeInput * secondsInDay);
      }
-
     let timeStr = String(timeInput).trim();
-
     const durationMatch = timeStr.match(/^(\d+):(\d{2}):(\d{2})$/);
     if (durationMatch) {
         const [, hoursStr, minutesStr, secondsStr] = durationMatch;
         const h = parseInt(hoursStr, 10);
         const m = parseInt(minutesStr, 10);
         const s = parseInt(secondsStr, 10);
-
          if (isNaN(h) || isNaN(m) || isNaN(s) || h < 0 || m < 0 || m > 59 || s < 0 || s > 59) {
               return null;
          }
-
         const totalSeconds = h * 3600 + m * 60 + s;
         return totalSeconds;
     }
-
      const minuteDurationMatch = timeStr.match(/^(\d+):(\d{2})$/);
       if (minuteDurationMatch) {
            const [, hoursStr, minutesStr] = minuteDurationMatch;
            const h = parseInt(hoursStr, 10);
            const m = parseInt(minutesStr, 10);
-
             if (isNaN(h) || isNaN(m) || h < 0 || m < 0 || m > 59) {
                  return null;
             }
-
            const totalSeconds = h * 3600 + m * 60;
            return totalSeconds;
       }
-
     return null;
   };
 
@@ -158,10 +139,8 @@ function FileUpload({ onUploadComplete }) {
       setMessage({ text: 'Nenhum arquivo selecionado.', type: 'error' });
       return;
     }
-
     setIsLoading(true);
     setMessage({ text: 'Lendo e processando arquivo...', type: 'info' });
-
     const reader = new FileReader();
     reader.onload = async (e) => {
       let transformedData = [];
@@ -176,7 +155,6 @@ function FileUpload({ onUploadComplete }) {
           raw: true,
           defval: null,
         });
-
         const workbook = XLSX.read(data, { type: 'binary', raw: false, cellDates: false });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
@@ -185,12 +163,9 @@ function FileUpload({ onUploadComplete }) {
           raw: false,
           defval: null,
         });
-
         if (rows.length < 2) throw new Error('Planilha vazia ou sem dados.');
-
         const headerRow = rows[0].map((h) => h ? String(h).trim() : null);
         const normalizeHeader = (header) => header ? String(header).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s/g, '') : null;
-
         const headerMap = {
           call_timestamp: headerRow.findIndex((h) => normalizeHeader(h) === normalizeHeader('Envio da Ligação')),
           duration_seconds: headerRow.findIndex((h) => normalizeHeader(h) === normalizeHeader('Tempo')),
@@ -200,20 +175,16 @@ function FileUpload({ onUploadComplete }) {
           operator_name: headerRow.findIndex((h) => normalizeHeader(h) === normalizeHeader('Operador')),
           tabulation: headerRow.findIndex((h) => normalizeHeader(h) === normalizeHeader('Tabulado Como')),
         };
-
         const requiredHeaders = ['Envio da Ligação', 'Tempo', 'UF', 'Grupo Usuário', 'Operador', 'Tabulado Como'];
         const missingHeaders = requiredHeaders.filter(h => headerRow.findIndex(hr => normalizeHeader(hr) === normalizeHeader(h)) === -1);
-
         if (missingHeaders.length > 0) {
           throw new Error(`Cabeçalho inválido. Colunas esperadas não encontradas: ${missingHeaders.join(', ')}`);
         }
-
         setMessage({
           text: `Processando ${rows.length - 1} linhas...`,
           type: 'info',
         });
         validationErrors = [];
-
         transformedData = rows
           .slice(1)
           .map((row, index) => {
@@ -221,26 +192,21 @@ function FileUpload({ onUploadComplete }) {
             const record = {};
             let rowHasError = false;
             const rowErrors = [];
-
             const rawRowFormatted = rows[index + 1];
             const rawRowRaw = rowsRaw[index + 1];
-
             const rawTimestamp = rawRowFormatted[headerMap.call_timestamp];
             const rawDurationFormatted = rawRowFormatted[headerMap.duration_seconds];
             const rawDurationRaw = rawRowRaw[headerMap.duration_seconds];
-
             const rawCpfCnpj = rawRowFormatted[headerMap.cpf_cnpj];
             const rawUf = rawRowFormatted[headerMap.uf];
             const rawUserGroup = rawRowFormatted[headerMap.user_group];
             const rawOperator = rawRowFormatted[headerMap.operator_name];
             const rawTabulation = rawRowFormatted[headerMap.tabulation];
-
             record.call_timestamp = parseFlexibleDateTime(rawTimestamp);
             if (record.call_timestamp === null) {
               rowErrors.push(`Data/Hora inválida ("${rawTimestamp}")`);
               rowHasError = true;
             }
-
             let parsedDuration = null;
             if (typeof rawDurationRaw === 'number' && rawDurationRaw >= 0 && rawDurationRaw < 1) {
                 const secondsInDay = 24 * 60 * 60;
@@ -248,9 +214,7 @@ function FileUpload({ onUploadComplete }) {
             } else {
                  parsedDuration = timeToSeconds(rawDurationFormatted);
             }
-
             record.duration_seconds = parsedDuration;
-
             if (record.duration_seconds === null) {
                  rowErrors.push(`Duração inválida ("${rawDurationFormatted}" / raw: ${rawDurationRaw})`);
                  rowHasError = true;
@@ -258,13 +222,11 @@ function FileUpload({ onUploadComplete }) {
                  rowErrors.push(`Duração negativa ("${rawDurationFormatted}" / raw: ${rawDurationRaw})`);
                  rowHasError = true;
             }
-
             record.cpf_cnpj = rawCpfCnpj ? String(rawCpfCnpj).trim() : null;
             record.uf = rawUf ? String(rawUf).trim().toUpperCase() : null;
             record.user_group = rawUserGroup ? String(rawUserGroup).trim() : null;
             record.operator_name = rawOperator ? String(rawOperator).trim() : null;
             record.tabulation = rawTabulation ? String(rawTabulation).trim() : null;
-
              if (!record.uf) {
                  rowErrors.push(`UF ausente.`);
                  rowHasError = true;
@@ -281,7 +243,6 @@ function FileUpload({ onUploadComplete }) {
                   rowErrors.push(`Tabulação ausente.`);
                   rowHasError = true;
              }
-
             if (rowHasError) {
                 validationErrors.push(`Linha ${rowNum}: ${rowErrors.join(', ')}`);
                  return null;
@@ -290,15 +251,12 @@ function FileUpload({ onUploadComplete }) {
             }
           })
           .filter((record) => record !== null);
-
         if (transformedData.length === 0 && validationErrors.length === 0) {
           throw new Error('Nenhum dado válido encontrado no arquivo.');
         }
-
         const totalRowsProcessed = rows.length - 1;
         const validRowsCount = transformedData.length;
         const ignoredRowsCount = totalRowsProcessed - validRowsCount;
-
         if (validationErrors.length > 0) {
           const errorMsg = `Foram encontrados ${validationErrors.length} erros de validação. ${ignoredRowsCount} registros foram ignorados.\nPrimeiros erros:\n${validationErrors
             .slice(0, 10)
@@ -310,7 +268,6 @@ function FileUpload({ onUploadComplete }) {
                type: validRowsCount > 0 ? 'warning' : 'error',
             });
         }
-
         if (validRowsCount > 0) {
            if (validationErrors.length === 0) {
                 setMessage({
@@ -318,7 +275,6 @@ function FileUpload({ onUploadComplete }) {
                    type: 'info',
                 });
            }
-
           const { error } = await insertCallRecords(transformedData);
           if (error) {
                const dbErrorMsg = `Erro ao inserir registros no banco: ${error.message}`;
@@ -332,24 +288,20 @@ function FileUpload({ onUploadComplete }) {
                }
                throw error;
           }
-
           const successMessage = `${validRowsCount} registros importados com sucesso!`;
           const summaryMessage = validationErrors.length > 0
               ? `${successMessage} (${ignoredRowsCount} inválidos ignorados).`
               : successMessage;
-
           setMessage({
             text: summaryMessage,
             type: 'success',
           });
-
         } else if (validationErrors.length === 0) {
              setMessage({
                  text: 'O arquivo não contém dados válidos para importação após o cabeçalho.',
                  type: 'error'
             });
         }
-
         setSelectedFile(null);
         if (document.getElementById('file-upload-input')) {
           document.getElementById('file-upload-input').value = null;
@@ -368,7 +320,7 @@ function FileUpload({ onUploadComplete }) {
       }
     };
     reader.readAsArrayBuffer(selectedFile);
-  }, [selectedFile, onUploadComplete]);
+  }, [selectedFile, onUploadComplete, message.text, message.type]);
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-md border border-slate-200 mb-6">
@@ -420,6 +372,8 @@ function FileUpload({ onUploadComplete }) {
               ? 'text-red-600'
               : message.type === 'success'
               ? 'text-green-600'
+              : message.type === 'warning'
+              ? 'text-yellow-600'
               : 'text-slate-600'
           } flex items-start`}
         >
@@ -429,6 +383,8 @@ function FileUpload({ onUploadComplete }) {
                 ? 'exclamation-circle'
                 : message.type === 'success'
                 ? 'check-circle'
+                : message.type === 'warning'
+                ? 'exclamation-triangle'
                 : 'info-circle'
             } mr-2 mt-1`}
           ></i>
@@ -438,5 +394,4 @@ function FileUpload({ onUploadComplete }) {
     </div>
   );
 }
-
 export default FileUpload;

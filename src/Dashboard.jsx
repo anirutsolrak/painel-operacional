@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import * as d3 from 'd3';
-import * as topojson from 'topojson-client';
-import Chart from 'chart.js/auto';
 import Header from './components/Header.jsx';
 import Filters from './components/Filters.jsx';
 import OperationsOverview from './components/OperationsOverview.jsx';
@@ -10,7 +7,6 @@ import PerformanceMetrics from './components/PerformanceMetrics.jsx';
 import BarChart from './components/charts/BarChart.jsx';
 import BrazilMap from './components/charts/BrazilMap.jsx';
 import FileUpload from './components/FileUpload.jsx';
-import LineChart from './components/charts/LineChart.jsx';
 import ExhibitionView from './components/ExhibitionView.jsx';
 import dataUtils from './utils/dataUtils';
 
@@ -21,7 +17,6 @@ function KPI_Card({ title, value, unit = '', trendValue = null, trendDirection =
             ? (lowerIsBetter ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100')
             : 'text-slate-600 bg-slate-100');
     const trendIcon = trendDirection === 'up' ? 'fa-arrow-up' : trendDirection === 'down' ? 'fa-arrow-down' : 'fa-minus';
-
     return (
         <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4 text-center hover:shadow-lg transition-shadow duration-300 hover:shadow-lg">
             <div className="text-sm font-medium text-slate-500 truncate mb-1">{title}</div>
@@ -55,9 +50,8 @@ function Dashboard({ onLogout, user }) {
   const [tabulationDistributionNav, setTabulationDistributionNav] = useState([]);
   const [stateMapData, setStateMapData] = useState({});
   const [hourlyData, setHourlyData] = useState([]);
-  const [statesList, setStatesList] = useState([]);
+  const [ufRegionsData, setUfRegionsData] = useState([]);
   const [operatorsList, setOperatorsList] = useState([]);
-  const [regionsList, setRegionsList] = useState([]);
   const [metricsToday, setMetricsToday] = useState({ current: null, previous: null });
   const [hourlyDataToday, setHourlyDataToday] = useState([]);
   const [tabulationDistributionToday, setTabulationDistributionToday] = useState([]);
@@ -65,6 +59,24 @@ function Dashboard({ onLogout, user }) {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [errorData, setErrorData] = useState(null);
    const [exhibitionDateRange, setExhibitionDateRange] = useState('week');
+
+    const statesList = useMemo(() => {
+        const states = ufRegionsData.map(item => item.uf).sort();
+        return states;
+    }, [ufRegionsData]);
+
+    const regionsList = useMemo(() => {
+        const regions = [...new Set(ufRegionsData.map(item => item.region_name))].sort();
+        return regions;
+    }, [ufRegionsData]);
+
+    const getUfsInSelectedRegion = useCallback(() => {
+        if (filters.region === 'all') {
+            return [];
+        }
+        return ufRegionsData.filter(item => item.region_name === filters.region).map(item => item.uf);
+    }, [filters.region, ufRegionsData]);
+
 
   const onToggleUpload = useCallback(() => {
     setShowUpload(prev => !prev);
@@ -115,16 +127,12 @@ function Dashboard({ onLogout, user }) {
        setExhibitionDateRange(newDateRange);
    }, []);
 
-  const brazilRegions = useMemo(
-    () => [
-      'all',
-      'Norte',
-      'Nordeste',
-      'Centro-Oeste',
-      'Sudeste',
-      'Sul'
-    ],
-    []
+  const brazilRegionsOptions = useMemo(
+    () => {
+        const options = regionsList.map(region => ({ value: region, label: region }));
+        options.unshift({ value: 'all', label: 'Sem Destaque' });
+        return options;
+    }, [regionsList]
   );
 
   const mapMetricOptions = useMemo(() => [
@@ -137,14 +145,16 @@ function Dashboard({ onLogout, user }) {
       ? operatorsList.find(op => op.id.toString() === selectedOperatorId)?.operator_name || null
       : null;
 
-    const dateParams = dataUtils.getDateRangeParams(filters.dateRange);
+    const regionUfs = getUfsInSelectedRegion();
+
+    const dateParams = dataUtils.getDateRangeParams(filters.dateRange, filters.customStartDate, filters.customEndDate);
 
     const currentFilters = {
       start_date: dateParams.current_start_date,
       end_date: dateParams.current_end_date,
       filter_state: filters.state === 'all' ? null : filters.state,
       filter_operator_name: operatorNameFilter,
-      filter_region: filters.region === 'all' ? null : filters.region,
+      filter_region_ufs: filters.region === 'all' ? null : regionUfs.length > 0 ? regionUfs : ['INVALID_STATE'], // Pass UFs for region filter
     };
 
      const previousFilters = {
@@ -152,7 +162,7 @@ function Dashboard({ onLogout, user }) {
          end_date: dateParams.previous_end_date,
          filter_state: filters.state === 'all' ? null : filters.state,
          filter_operator_name: operatorNameFilter,
-         filter_region: filters.region === 'all' ? null : filters.region,
+         filter_region_ufs: filters.region === 'all' ? null : regionUfs.length > 0 ? regionUfs : ['INVALID_STATE'], // Pass UFs for region filter
      }
 
     setIsLoadingData(true);
@@ -207,7 +217,7 @@ function Dashboard({ onLogout, user }) {
     } finally {
       setIsLoadingData(false);
     }
-  }, [filters, selectedOperatorId, operatorsList]);
+  }, [filters, selectedOperatorId, operatorsList, getUfsInSelectedRegion]);
 
   const fetchDataForExhibition = useCallback(async () => {
     setIsLoadingData(true);
@@ -222,7 +232,7 @@ function Dashboard({ onLogout, user }) {
          end_date: dateParams.current_end_date,
          filter_state: null,
          filter_operator_name: null,
-         filter_region: null,
+         filter_region_ufs: null, // No region filter in exhibition mode
      };
 
     const previousDateParams = dataUtils.getDateRangeParams(exhibitionDateRange);
@@ -232,7 +242,7 @@ function Dashboard({ onLogout, user }) {
          end_date: previousDateParams.previous_end_date,
          filter_state: null,
          filter_operator_name: null,
-         filter_region: null,
+         filter_region_ufs: null, // No region filter in exhibition mode
     };
 
     try {
@@ -275,43 +285,44 @@ function Dashboard({ onLogout, user }) {
   useEffect(() => {
     const fetchInitialLists = async () => {
       try {
-        const [operatorsResult, statesListResult, regionsListResult] = await Promise.all([
+        const [operatorsResult, ufRegionsResult] = await Promise.all([
           dataUtils.getOperators(),
-          dataUtils.getStates(),
-          dataUtils.getRegions(),
+          dataUtils.getUfRegions(),
         ]);
         if (operatorsResult.error) console.error("📊 [Dashboard] Erro ao carregar operadores:", operatorsResult.error);
-        if (statesListResult.error) console.error("📊 [Dashboard] Erro ao carregar estados:", statesListResult.error);
-        if (regionsListResult.error) console.error("📊 [Dashboard] Erro ao carregar regiões:", regionsListResult.error);
+        if (ufRegionsResult.error) console.error("📊 [Dashboard] Erro ao carregar UF-Regiões:", ufRegionsResult.error);
 
         setOperatorsList(operatorsResult.data || []);
-        setStatesList(statesListResult.data || []);
-        setRegionsList(regionsListResult.data || []);
+        setUfRegionsData(ufRegionsResult.data || []);
+
       } catch (err) {
         console.error("📊 [Dashboard] Erro geral ao carregar listas iniciais:", err);
         setErrorData("Falha ao carregar listas iniciais. Tente recarregar a página.");
         setOperatorsList([]);
-        setStatesList([]);
-        setRegionsList([]);
+        setUfRegionsData([]);
         setIsLoadingData(false);
       }
     };
-
-    if (operatorsList.length === 0 || statesList.length === 0 || regionsList.length === 0) {
+    if (operatorsList.length === 0 || ufRegionsData.length === 0) {
       fetchInitialLists();
     }
-  }, [operatorsList.length, statesList.length, regionsList.length]);
+  }, [operatorsList.length, ufRegionsData.length]);
 
   useEffect(() => {
     if (displayMode === 'navigation') {
-      if (operatorsList.length > 0 || selectedOperatorId === 'all') {
+      if ((operatorsList.length > 0 || selectedOperatorId === 'all') && ufRegionsData.length > 0) {
         fetchDataForFilters();
-      } else {
-        if (!isLoadingData) setIsLoadingData(true);
-        if (errorData) setErrorData(null);
+      } else if (!isLoadingData && ufRegionsData.length === 0 && operatorsList.length === 0) {
+         // Keep loading state if lists are still empty
+         setIsLoadingData(true);
+         setErrorData(null); // Clear previous error if fetching lists failed
+      } else if (!isLoadingData && (ufRegionsData.length > 0 || operatorsList.length > 0)) {
+           // Lists fetched, but no data yet, trigger fetch
+           fetchDataForFilters();
       }
     }
-  }, [filters, selectedOperatorId, operatorsList.length, displayMode, fetchDataForFilters]);
+  }, [filters, selectedOperatorId, operatorsList.length, ufRegionsData.length, displayMode, fetchDataForFilters]);
+
 
   useEffect(() => {
     if (displayMode === 'exhibition') {
@@ -335,16 +346,13 @@ function Dashboard({ onLogout, user }) {
 
   const validTabulationDataNav = useMemo(() => {
       if (!tabulationDistributionNav) return [];
-
       const filteredData = tabulationDistributionNav.filter(item => {
           const lowerTab = item.tabulation ? String(item.tabulation).trim().toLowerCase() : '';
           return lowerTab !== 'endereço confirmado' && !tempoPerdidoTabulations.includes(lowerTab);
       });
-
       return filteredData
           .sort((a, b) => b.count - a.count)
           .map(d => ({ label: d.tabulation, value: d.count }));
-
   }, [tabulationDistributionNav, tempoPerdidoTabulations]);
 
    const showTabulationPlaceholderNav = !tabulationDistributionNav || tabulationDistributionNav.length === 0 || validTabulationDataNav.length === 0;
@@ -377,6 +385,7 @@ function Dashboard({ onLogout, user }) {
               onOperatorChange={handleOperatorChange}
               states={statesList}
               regions={regionsList}
+              ufRegionsData={ufRegionsData}
               disabled={isLoadingData}
               goalValue={goalValue}
               onGoalInputChange={handleGoalInputChange}
@@ -437,9 +446,9 @@ function Dashboard({ onLogout, user }) {
                           aria-label="Selecionar região para destaque no mapa"
                           disabled={isLoadingData}
                         >
-                          {brazilRegions.map((region) => (
-                            <option key={region} value={region}>
-                              {region === 'all' ? 'Sem Destaque' : region}
+                          {brazilRegionsOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
                             </option>
                           ))}
                         </select>
@@ -466,6 +475,7 @@ function Dashboard({ onLogout, user }) {
                           selectedMetric={selectedMapMetric}
                           selectedMapRegion={selectedMapRegion}
                           metricOptions={mapMetricOptions}
+                          ufRegionsData={ufRegionsData}
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-slate-500">

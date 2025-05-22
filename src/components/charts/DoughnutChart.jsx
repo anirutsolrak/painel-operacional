@@ -19,15 +19,12 @@ function DoughnutChart({
       }
       const ctx = chartRef.current.getContext('2d');
       if (!ctx) return;
-
       if (chartInstance.current) {
         chartInstance.current.destroy();
         chartInstance.current = null;
       }
-
       const timeoutId = setTimeout(() => {
         if (!chartRef.current) return;
-
         chartInstance.current = new Chart(ctx, {
           type: 'doughnut',
           data: {
@@ -82,7 +79,6 @@ function DoughnutChart({
           },
         });
       }, 600);
-
       return () => {
         clearTimeout(timeoutId);
         if (chartInstance.current) {
@@ -98,5 +94,4 @@ function DoughnutChart({
 
     return <canvas ref={chartRef}></canvas>;
   }
-
   export default DoughnutChart;

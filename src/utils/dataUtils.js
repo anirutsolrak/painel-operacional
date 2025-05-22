@@ -4,9 +4,8 @@ import {
   fetchHourlyCallCounts,
   fetchTabulationDistribution,
   fetchStateMapData,
-  fetchOperators,
-  fetchStates,
-  fetchRegions
+  fetchOperators, // Importar a versão que chama a RPC
+  fetchUfRegions
 } from './supabaseClient';
 
 function formatDuration(seconds) {
@@ -17,18 +16,15 @@ function formatDuration(seconds) {
     seconds < 0
   )
     return '00:00';
-
   const totalSeconds = Math.round(seconds);
   const days = Math.floor(totalSeconds / (24 * 3600));
   const remainingSecondsAfterDays = totalSeconds % (24 * 3600);
   const hours = Math.floor(remainingSecondsAfterDays / 3600);
   const minutes = Math.floor((remainingSecondsAfterDays % 3600) / 60);
   const remainingSeconds = remainingSecondsAfterDays % 60;
-
   const paddedHours = hours.toString().padStart(2, '0');
   const paddedMinutes = minutes.toString().padStart(2, '0');
   const paddedSeconds = remainingSeconds.toString().padStart(2, '0');
-
   if (days > 0) {
     return `${days}d ${paddedHours}:${paddedMinutes}:${paddedSeconds}`;
   } else if (hours > 0) {
@@ -62,20 +58,16 @@ function calculateTrend(current, previous) {
     if (current < 0) return { value: '-∞', direction: 'down' };
     return { value: '0.0', direction: 'neutral' };
   }
-
   if (current === 0) {
     if (previous > 0) return { value: '∞', direction: 'down' };
     if (previous < 0) return { value: '-∞', direction: 'up' };
     return { value: '0.0', direction: 'neutral' };
   }
-
   const trend = ((current - previous) / previous) * 100;
   if (isNaN(trend)) return { value: null, direction: 'neutral' };
-
   let direction = 'neutral';
   if (trend > 0.1) direction = 'up';
   if (trend < -0.1) direction = 'down';
-
   return { value: Math.abs(trend).toFixed(1), direction: direction };
 }
 
@@ -83,22 +75,17 @@ function getDateRangeParams(dateRange, customStartDate = null, customEndDate = n
   const now = new Date();
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);
-
   let current_start_date;
   let current_end_date = new Date(now);
   let previous_start_date;
   let previous_end_date;
-
   if (dateRange === 'custom' && customStartDate && customEndDate) {
     current_start_date = new Date(customStartDate);
     current_end_date = new Date(customEndDate);
     current_end_date.setHours(23, 59, 59, 999);
-
     const daysDiff = Math.ceil((current_end_date - current_start_date) / (1000 * 60 * 60 * 24));
-    
     previous_start_date = new Date(current_start_date);
     previous_start_date.setDate(previous_start_date.getDate() - daysDiff);
-    
     previous_end_date = new Date(current_start_date);
     previous_end_date.setDate(previous_end_date.getDate() - 1);
     previous_end_date.setHours(23, 59, 59, 999);
@@ -149,7 +136,6 @@ function getDateRangeParams(dateRange, customStartDate = null, customEndDate = n
         previous_end_date.setHours(23, 59, 59, 999);
         break;
       default:
-        // Default to today if no valid date range is provided
         current_start_date = new Date(today);
         current_end_date = new Date(today);
         current_end_date.setHours(23, 59, 59, 999);
@@ -159,7 +145,6 @@ function getDateRangeParams(dateRange, customStartDate = null, customEndDate = n
         previous_end_date.setHours(23, 59, 59, 999);
     }
   }
-
   return {
     current_start_date: current_start_date ? current_start_date.toISOString() : '',
     current_end_date: current_end_date ? current_end_date.toISOString() : '',
@@ -168,27 +153,14 @@ function getDateRangeParams(dateRange, customStartDate = null, customEndDate = n
   };
 }
 
-const stateRegions = {
-  'AC': 'Norte', 'AM': 'Norte', 'AP': 'Norte', 'PA': 'Norte', 'RO': 'Norte', 'RR': 'Norte', 'TO': 'Norte',
-  'AL': 'Nordeste', 'BA': 'Nordeste', 'CE': 'Nordeste', 'MA': 'Nordeste', 'PB': 'Nordeste', 'PE': 'Nordeste', 'PI': 'Nordeste', 'RN': 'Nordeste', 'SE': 'Nordeste',
-  'DF': 'Centro-Oeste', 'GO': 'Centro-Oeste', 'MS': 'Centro-Oeste', 'MT': 'Centro-Oeste',
-  'ES': 'Sudeste', 'MG': 'Sudeste', 'RJ': 'Sudeste', 'SP': 'Sudeste',
-  'PR': 'Sul', 'RS': 'Sul', 'SC': 'Sul'
-};
-
-// Define the missing functions by mapping them to the imported functions
 const getPerformanceMetrics = fetchDashboardMetricsWithTrend;
 const getTimeSeriesData = fetchHourlyCallCounts;
 const getStatusDistribution = fetchStatusDistribution;
 const getTabulationDistribution = fetchTabulationDistribution;
 const getStateData = fetchStateMapData;
 const getOperators = fetchOperators;
-const getStates = fetchStates;
-const getRegions = () => {
-  // Return unique regions in a specific order
-  const uniqueRegions = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
-  return Promise.resolve({ data: uniqueRegions, error: null });
-};
+const getUfRegions = fetchUfRegions;
+
 
 const dataUtils = {
   getPerformanceMetrics,
@@ -197,13 +169,11 @@ const dataUtils = {
   getTabulationDistribution,
   getStateData,
   getOperators,
-  getStates,
-  getRegions,
+  getUfRegions,
   getDateRangeParams,
   formatDuration,
   formatPercentage,
   calculateTrend,
-  stateRegions,
 };
 
 export default dataUtils;

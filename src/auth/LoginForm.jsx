@@ -22,7 +22,6 @@ export default function LoginForm() {
 
             if (authError) throw authError;
             if (!data?.user) throw new Error("Autenticação bem-sucedida, mas sem dados do usuário.");
-
         } catch (err) {
             console.error("[Login] Failed:", err);
             setError(err?.message?.includes("Invalid login credentials")

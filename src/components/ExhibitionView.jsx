@@ -3,10 +3,8 @@ import { motion } from 'framer-motion';
 import dataUtils from '../utils/dataUtils';
 import BarChart from '../components/charts/BarChart.jsx';
 import DoughnutChart from '../components/charts/DoughnutChart.jsx';
-import LineChart from '../components/charts/LineChart.jsx';
 
 function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistribution, goalValue, operatorsList, selectedOperatorId, KPI_Card, selectedDateRange, isLoading, error }) {
-
     const tempoPerdidoTabulations = useMemo(() => [
         'telefone incorreto',
         'recusa',
@@ -25,12 +23,10 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
         const attendedCount = metrics?.ligaçõesAtendidasCount || 0;
         const totalCalls = metrics?.totalLigações || 0;
         const othersCount = totalCalls - attendedCount;
-
         const data = [
             { label: 'Atendidas', value: attendedCount },
             { label: 'Outras', value: othersCount },
         ].filter(d => d.value > 0);
-
         return data;
     }, [metrics]);
 
@@ -42,17 +38,14 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
 
     const topTabulationsData = useMemo(() => {
         if (!tabulationDistribution) return [];
-
          const filteredData = tabulationDistribution.filter(item => {
              const lowerTab = item.tabulation ? String(item.tabulation).trim().toLowerCase() : '';
              return lowerTab !== 'endereço confirmado' && !tempoPerdidoTabulations.includes(lowerTab);
          });
-
          const data = filteredData
              .sort((a, b) => b.count - a.count)
              .slice(0, 5)
              .map(d => ({ label: d.tabulation, value: d.count }));
-
         return data;
       }, [tabulationDistribution, tempoPerdidoTabulations]);
 
@@ -62,7 +55,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
     const calculatedGoalValue = useMemo(() => {
         const numericGoal = parseFloat(goalValue);
         if (isNaN(numericGoal) || numericGoal <= 0) return 0;
-
         if (!isOperatorSelected) {
             return numericGoal;
         } else {
@@ -88,19 +80,16 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
 
     const goalChartData = useMemo(() => {
           if (calculatedGoalValue <= 0) return [];
-
           if (callsRealized >= calculatedGoalValue && calculatedGoalValue > 0) {
              return [
                 { label: 'Realizado', value: calculatedGoalValue },
                 { label: 'Restante', value: 0 }
              ];
           }
-
           return [
               { label: 'Realizado', value: callsRealized },
               { label: 'Restante', value: callsRemaining }
           ];
-
     }, [calculatedGoalValue, callsRealized, callsRemaining]);
 
     const percentageAchieved = useMemo(() => {
@@ -181,7 +170,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                         />
                         <KPI_Card title="Taxa Sucesso (Tab.)" value={formattedTaxaSucesso} trendValue={sucessoRateTrend.value} trendDirection={sucessoRateTrend.direction} lowerIsBetter={false}/>
                         <KPI_Card title="Taxa Não Efetivo (Tab.)" value={formattedTaxaNaoEfetivo} trendValue={naoEfetivoRateTrend.value} trendDirection={naoEfetivoRateTrend.direction} lowerIsBetter={true}/>
-
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                         <div className="bg-white rounded-lg shadow-md border border-slate-200 p-4 flex flex-col h-full">
@@ -216,7 +204,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                                          </motion.div>
                                       )}
                                     </div>
-
                                     <div className="relative h-[200px] sm:h-auto">
                                        {calculatedGoalValue > 0 ? (
                                            <DoughnutChart
@@ -229,8 +216,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                                                Meta {isOperatorSelected ? 'do Operador' : 'da Logística'} inválida ou não definida.
                                             </div>
                                        )}
-
-
                                         {calculatedGoalValue > 0 && (
                                              <motion.div
                                                 initial={{ opacity: 0, scale: 0.8 }}
@@ -244,8 +229,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                                                   </span>
                                              </motion.div>
                                         )}
-
-
                                          {calculatedGoalValue > 0 && (
                                               <motion.div
                                                  initial={{ opacity: 0, y: 10 }}
@@ -259,7 +242,6 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                                                   </span>
                                               </motion.div>
                                          )}
-
                                     </div>
                                   </>
                                )}
@@ -316,5 +298,4 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
         </div>
     );
 }
-
 export default ExhibitionView;

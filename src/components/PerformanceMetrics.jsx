@@ -3,41 +3,32 @@ import { motion } from 'framer-motion';
 import dataUtils from '../utils/dataUtils';
 import BarChart from './charts/BarChart.jsx';
 import DoughnutChart from './charts/DoughnutChart.jsx';
-import LineChart from './charts/LineChart.jsx';
 
 function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList, selectedOperatorId }) {
-
   const hourlyChartData = useMemo(() => {
     if (!timeSeriesData) return [];
     return timeSeriesData.map(d => ({ label: `${d.hora.toString().padStart(2, '0')}:00`, value: d.chamadas }));
   }, [timeSeriesData]);
-
   const attendedVsOthersData = useMemo(() => {
      const attendedCount = metrics?.ligaçõesAtendidasCount || 0;
      const totalCalls = metrics?.totalLigações || 0;
      const othersCount = totalCalls - attendedCount;
-
      return [
        { label: 'Atendidas', value: attendedCount },
        { label: 'Outras', value: othersCount },
      ].filter(d => d.value > 0);
    }, [metrics]);
-
   const formattedTMA = useMemo(
     () => dataUtils.formatDuration(metrics?.tma),
     [metrics?.tma]
   );
-
     const showMetricsPlaceholders = !metrics || (attendedVsOthersData.length === 0);
     const showHourlyPlaceholder = !timeSeriesData || timeSeriesData.length === 0 || hourlyChartData.every(d => d.value === 0);
-
    const isOperatorSelected = selectedOperatorId !== 'all';
    const metaTitle = isOperatorSelected ? `Meta Operador` : `Meta Logística`;
-
    const calculatedGoalValue = useMemo(() => {
        const numericGoal = parseFloat(goalValue);
        if (isNaN(numericGoal) || numericGoal <= 0) return 0;
-
        if (!isOperatorSelected) {
            return numericGoal;
        } else {
@@ -45,7 +36,6 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
            return numericGoal / totalOperators;
        }
    }, [goalValue, isOperatorSelected, operatorsList?.length]);
-
    const formattedGoalValue = useMemo(() => {
         if (calculatedGoalValue === 0) return 'Defina a Meta';
         if (!isOperatorSelected) {
@@ -56,41 +46,31 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
              }
              return 'N/A';
         }
-
    }, [calculatedGoalValue, isOperatorSelected]);
-
     const callsRealized = metrics?.sucessoTabulacoesCount || 0;
     const callsRemaining = Math.max(0, calculatedGoalValue - callsRealized);
-
    const goalChartData = useMemo(() => {
          if (calculatedGoalValue <= 0) return [];
-
          if (callsRealized >= calculatedGoalValue && calculatedGoalValue > 0) {
             return [
-               { label: 'Realizado', value: calculatedGoalValue },
+               { label: 'End.Confirmado', value: calculatedGoalValue },
                { label: 'Restante', value: 0 }
             ];
          }
-
          return [
-             { label: 'Realizado', value: callsRealized },
+             { label: 'End.Confirmado', value: callsRealized },
              { label: 'Restante', value: callsRemaining }
          ];
-
    }, [calculatedGoalValue, callsRealized, callsRemaining]);
-
    const percentageAchieved = useMemo(() => {
        if (calculatedGoalValue <= 0) return 0;
        const percentage = (callsRealized / calculatedGoalValue) * 100;
        return Math.min(100, percentage);
    }, [callsRealized, calculatedGoalValue]);
-
     const goalCenterText = useMemo(() => {
         if (calculatedGoalValue <= 0) return 'Defina a Meta';
         return `${percentageAchieved.toFixed(0)}%`;
     }, [percentageAchieved, calculatedGoalValue]);
-
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -134,7 +114,6 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
                        </motion.div>
                     )}
                   </div>
-
                   <div className="relative h-[200px] sm:h-auto">
                        {calculatedGoalValue > 0 ? (
                            <DoughnutChart
@@ -147,7 +126,6 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
                                Meta {isOperatorSelected ? 'do Operador' : 'da Logística'} inválida ou não definida.
                             </div>
                        )}
-
                        <motion.div
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
@@ -178,7 +156,6 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
                                     </span>
                                 </motion.div>
                            )}
-
                   </div>
                 </>
             )}
@@ -199,7 +176,6 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
           </div>
         </motion.div>
       </div>
-
       <div
         data-name="metrics-chart-hourly"
         className="bg-white rounded-lg shadow-md border border-slate-200 p-6 flex flex-col"
@@ -217,9 +193,7 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
            )}
         </div>
       </div>
-
     </motion.div>
   );
 }
-
 export default PerformanceMetrics;

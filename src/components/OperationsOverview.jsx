@@ -4,19 +4,16 @@ import dataUtils from '../utils/dataUtils';
 
 const TrendIndicator = ({ trend, lowerIsBetter = false }) => {
      if (!trend || (trend.value === null || trend.value === undefined)) return null;
-
      const getTrendClass = (direction, isLowerBetter) => {
         if (direction === 'up') return isLowerBetter ? 'text-red-600 bg-red-100' : 'text-green-600 bg-green-100';
         if (direction === 'down') return isLowerBetter ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100';
         return 'text-slate-600 bg-slate-100';
      };
-
      const getTrendIcon = (direction) => {
         if (direction === 'up') return 'fa-arrow-up';
         if (direction === 'down') return 'fa-arrow-down';
         return 'fa-minus';
      };
-
      return (
        <motion.div
          initial={{ scale: 0.8, opacity: 0 }}
@@ -33,7 +30,6 @@ const TrendIndicator = ({ trend, lowerIsBetter = false }) => {
      );
 };
 
-
 function OperationsOverview({ currentMetrics, previousMetrics }) {
   const successTrend = dataUtils.calculateTrend(
     currentMetrics?.taxaSucesso,
@@ -43,27 +39,20 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
     currentMetrics?.taxaNaoEfetivo,
     previousMetrics?.taxaNaoEfetivo
   );
-
   const tempoPerdidoTrend = dataUtils.calculateTrend(
       currentMetrics?.tempoPerdidoSegundos,
       previousMetrics?.tempoPerdidoSegundos
     );
-
-
   const timeTrend = dataUtils.calculateTrend(
       currentMetrics?.tma,
       previousMetrics?.tma
     );
-
-
   const formatValue = useCallback((value, formatter) => {
       if (value === undefined || value === null) return '0';
       if (value === 0 && formatter === dataUtils.formatPercentage) return '0.0%';
       if (value === 0 && formatter === dataUtils.formatDuration) return '00:00';
-
       return formatter && typeof formatter === 'function' ? formatter(value) : value.toLocaleString('pt-BR');
   }, []);
-
 
   return (
     <motion.div
@@ -89,7 +78,6 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
         </div>
         <TrendIndicator trend={successTrend} lowerIsBetter={false} />
       </motion.div>
-
       <motion.div
         whileHover={{ scale: 1.02 }}
         className="bg-white rounded-lg shadow-md border border-slate-200 p-4 transition-all duration-300 hover:shadow-lg"
@@ -100,7 +88,6 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
         </div>
         <TrendIndicator trend={otherTabTrend} lowerIsBetter={true} />
       </motion.div>
-
       <motion.div
         whileHover={{ scale: 1.02 }}
         className="bg-white rounded-lg shadow-md border border-slate-200 p-4 transition-all duration-300 hover:shadow-lg"
@@ -117,8 +104,6 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
         </div>
         <TrendIndicator trend={tempoPerdidoTrend} lowerIsBetter={true} />
       </motion.div>
-
-
       <motion.div
         whileHover={{ scale: 1.02 }}
         className="bg-white rounded-lg shadow-md border border-slate-200 p-4 transition-all duration-300 hover:shadow-lg"
@@ -132,5 +117,4 @@ function OperationsOverview({ currentMetrics, previousMetrics }) {
     </motion.div>
   );
 }
-
 export default OperationsOverview;

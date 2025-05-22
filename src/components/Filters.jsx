@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import dataUtils from '../utils/dataUtils';
 
 function Filters({
   filters,
@@ -9,6 +8,7 @@ function Filters({
   onOperatorChange,
   states,
   regions,
+  ufRegionsData,
   disabled,
   goalValue,
   onGoalInputChange,
@@ -18,30 +18,52 @@ function Filters({
 
   useEffect(() => {
     setLocalFilters(filters);
+    if (filters.dateRange === 'custom') {
+        setCustomDateRange({
+            start: filters.customStartDate || '',
+            end: filters.customEndDate || ''
+        });
+    } else {
+        setCustomDateRange({ start: '', end: '' });
+    }
   }, [filters]);
 
   const handleDateRangeChange = useCallback((e) => {
     const newDateRange = e.target.value;
-    const updatedFilters = { ...localFilters, dateRange: newDateRange };
-    setLocalFilters(updatedFilters);
-    onFilterChange(updatedFilters);
-  }, [localFilters, onFilterChange]);
-
-  const handleCustomDateChange = useCallback((type, value) => {
-    const newCustomDate = { ...customDateRange, [type]: value };
-    setCustomDateRange(newCustomDate);
-    
-    if (newCustomDate.start && newCustomDate.end) {
-      const updatedFilters = { 
-        ...localFilters, 
-        dateRange: 'custom',
-        customStartDate: newCustomDate.start,
-        customEndDate: newCustomDate.end 
-      };
-      setLocalFilters(updatedFilters);
-      onFilterChange(updatedFilters);
+    const updatedFilters = { ...filters, dateRange: newDateRange };
+    if (newDateRange !== 'custom') {
+        delete updatedFilters.customStartDate;
+        delete updatedFilters.customEndDate;
+        onFilterChange(updatedFilters);
     }
-  }, [localFilters, customDateRange, onFilterChange]);
+    setLocalFilters(updatedFilters);
+
+  }, [filters, onFilterChange]);
+
+
+  const handleCustomDateInputChange = useCallback((type, value) => {
+    setCustomDateRange(prev => ({ ...prev, [type]: value }));
+  }, []);
+
+  const handleConfirmCustomDate = useCallback(() => {
+      if (localFilters.dateRange === 'custom' && customDateRange.start && customDateRange.end) {
+           const isValidStartDate = /^\d{4}-\d{2}-\d{2}$/.test(customDateRange.start);
+           const isValidEndDate = /^\d{4}-\d{2}-\d{2}$/.test(customDateRange.end);
+
+           if (isValidStartDate && isValidEndDate) {
+              const updatedFilters = {
+                  ...filters,
+                  dateRange: 'custom',
+                  customStartDate: customDateRange.start,
+                  customEndDate: customDateRange.end
+              };
+              onFilterChange(updatedFilters);
+           } else {
+               console.error("Datas personalizadas inválidas.");
+           }
+      }
+  }, [filters, localFilters.dateRange, customDateRange, onFilterChange]);
+
 
   const handleStateChange = useCallback((e) => {
     const newState = e.target.value;
@@ -63,11 +85,10 @@ function Filters({
   }, [onOperatorChange]);
 
   const operatorOptions = useMemo(() => {
-    const options = operators ? operators.map(op => ({ 
-      value: op.id.toString(), 
-      label: op.operator_name 
+    const options = operators ? operators.map(op => ({
+      value: op.id.toString(),
+      label: op.operator_name
     })) : [];
-    
     if (!options.some(opt => opt.value === 'all')) {
       options.unshift({ value: 'all', label: 'Todos Operadores' });
     }
@@ -76,15 +97,16 @@ function Filters({
 
   const stateOptions = useMemo(() => {
     let filteredStates = states || [];
-
-    if (dataUtils && dataUtils.stateRegions && localFilters.region && localFilters.region !== 'all') {
-      filteredStates = (states || []).filter(uf => dataUtils.stateRegions[uf] === localFilters.region);
+    if (localFilters.region && localFilters.region !== 'all' && ufRegionsData && ufRegionsData.length > 0) {
+        const ufsInRegion = ufRegionsData
+            .filter(item => item.region_name === localFilters.region)
+            .map(item => item.uf);
+        filteredStates = (states || []).filter(uf => ufsInRegion.includes(uf));
     }
-
     const options = filteredStates.map(state => ({ value: state, label: state }));
     options.unshift({ value: 'all', label: 'Todos Estados' });
     return options;
-  }, [states, localFilters.region]);
+  }, [states, localFilters.region, ufRegionsData]);
 
   const regionOptions = useMemo(() => {
     const options = regions ? regions.map(region => ({ value: region, label: region })) : [];
@@ -118,21 +140,27 @@ function Filters({
               <input
                 type="date"
                 value={customDateRange.start}
-                onChange={(e) => handleCustomDateChange('start', e.target.value)}
+                onChange={(e) => handleCustomDateInputChange('start', e.target.value)}
                 className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 disabled={disabled}
               />
               <input
                 type="date"
                 value={customDateRange.end}
-                onChange={(e) => handleCustomDateChange('end', e.target.value)}
+                onChange={(e) => handleCustomDateInputChange('end', e.target.value)}
                 className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 disabled={disabled}
               />
+              <button
+                  onClick={handleConfirmCustomDate}
+                  disabled={disabled || !customDateRange.start || !customDateRange.end}
+                  className="w-full bg-blue-600 text-white py-1.5 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center text-xs"
+              >
+                  Confirmar Período
+              </button>
             </div>
           )}
         </div>
-
         <div>
           <label htmlFor="state" className="block text-sm font-medium text-slate-700 mb-1">Estado (UF)</label>
           <select
@@ -140,14 +168,13 @@ function Filters({
             value={localFilters.state}
             onChange={handleStateChange}
             className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={disabled}
+            disabled={disabled || states.length === 0 && localFilters.state !== 'all'}
           >
             {stateOptions.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </div>
-
         <div>
           <label htmlFor="region" className="block text-sm font-medium text-slate-700 mb-1">Região</label>
           <select
@@ -155,14 +182,13 @@ function Filters({
             value={localFilters.region || 'all'}
             onChange={handleRegionChange}
             className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={disabled}
+            disabled={disabled || regions.length <= 1}
           >
             {regionOptions.map(option => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </div>
-
         <div>
           <label htmlFor="operator" className="block text-sm font-medium text-slate-700 mb-1">Operador</label>
           <select
@@ -177,7 +203,6 @@ function Filters({
             ))}
           </select>
         </div>
-
         <div>
           <label htmlFor="goalValue" className="block text-sm font-medium text-slate-700 mb-1">Meta (Chamadas Sucesso)</label>
           <input
@@ -194,5 +219,4 @@ function Filters({
     </div>
   );
 }
-
 export default React.memo(Filters);
