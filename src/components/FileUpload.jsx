@@ -27,110 +27,75 @@ function FileUpload({ onUploadComplete }) {
     }
   };
 
-  const parseFlexibleDateTime = (dateTimeInput) => {
-    if (dateTimeInput === null || dateTimeInput === undefined || dateTimeInput === '') return null;
-    let dateTimeStr = String(dateTimeInput).trim();
-    let dateObj = null;
-    if (typeof dateTimeInput === 'number' && dateTimeInput > 1) {
-      try {
-        dateObj = XLSX.SSF.parse_date_code(dateTimeInput, { date1904: false });
-        if (dateObj) {
-          dateObj = new Date(
-            Date.UTC(
-              dateObj.y,
-              dateObj.m - 1,
-              dateObj.d,
-              dateObj.H || 0,
-              dateObj.M || 0,
-              dateObj.S || 0
-            )
-          );
-        }
-      } catch (e) {
-        dateObj = null;
-      }
+  const formatExcelDateToISO = (excelDateInput) => {
+    if (excelDateInput === null || excelDateInput === undefined || excelDateInput === "") {
+      return null;
     }
-    if (!dateObj || isNaN(dateObj.getTime())) {
-      const match = dateTimeStr.match(
-        /^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2}|\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
-      );
-      if (match) {
-        let [, part1, part2, year, hours, minutes, seconds] = match;
-        seconds = seconds ? parseInt(seconds, 10) : 0;
-        let day, month;
-        const yearInt = parseInt(year, 10);
-        const part1Int = parseInt(part1, 10);
-        const part2Int = parseInt(part2, 10);
-        if (yearInt < 100) {
-             year = 2000 + yearInt;
+    let date;
+    if (excelDateInput instanceof Date) {
+      date = excelDateInput;
+    } else if (typeof excelDateInput === 'number') {
+      const parsed = XLSX.SSF.parse_date_code(excelDateInput);
+      if (!parsed) return null;
+      date = new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d, parsed.H || 0, parsed.M || 0, parsed.S || 0));
+    } else if (typeof excelDateInput === 'string') {
+      let parsedDate = new Date(excelDateInput);
+      if (isNaN(parsedDate.getTime())) {
+        const parts = excelDateInput.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?(?:\.\d+)?Z?$/);
+        if (parts) {
+          const day = parseInt(parts[1], 10);
+          const month = parseInt(parts[2], 10);
+          const year = parseInt(parts[3].length === 2 ? `20${parts[3]}` : parts[3], 10);
+          const hour = parts[4] ? parseInt(parts[4], 10) : 0;
+          const minute = parts[5] ? parseInt(parts[5], 10) : 0;
+          const second = parts[6] ? parseInt(parts[6], 10) : 0;
+          parsedDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
         } else {
-             year = yearInt;
-        }
-        if (part1Int > 12 && part2Int <= 12) {
-            day = part1Int;
-            month = part2Int;
-        } else if (part2Int > 12 && part1Int <= 12) {
-             month = part1Int;
-             day = part2Int;
-        } else {
-            day = part1Int;
-            month = part2Int;
-        }
-        try {
-          dateObj = new Date(Date.UTC(year, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), seconds));
-        } catch (e) {
-          dateObj = null;
-        }
-        if (!dateObj || isNaN(dateObj.getTime())) {
-             if (part1Int <= 12 && part2Int <= 12 && part1Int !== part2Int) {
-                  day = part2Int;
-                  month = part1Int;
-                  try {
-                       dateObj = new Date(Date.UTC(year, month - 1, day, parseInt(hours, 10), parseInt(minutes, 10), seconds));
-                  } catch(e) {
-                        dateObj = null;
-                  }
-             }
+          const isoAttemptWithSpace = excelDateInput.replace(' ', 'T');
+          parsedDate = new Date(isoAttemptWithSpace);
+          if (isNaN(parsedDate.getTime())) return null;
         }
       }
-    }
-    if (dateObj && !isNaN(dateObj.getTime())) {
-      return dateObj.toISOString();
+      date = parsedDate;
     } else {
       return null;
     }
+
+    if (isNaN(date.getTime())) return null;
+
+    return date.toISOString();
   };
 
   const timeToSeconds = (timeInput) => {
     if (timeInput === null || timeInput === undefined || timeInput === '') return null;
-     if (typeof timeInput === 'number' && timeInput >= 0 && timeInput < 1) {
-         const secondsInDay = 24 * 60 * 60;
-         return Math.round(timeInput * secondsInDay);
-     }
+    if (typeof timeInput === 'number' && timeInput >= 0 && timeInput < 1) {
+      const secondsInDay = 24 * 60 * 60;
+      return Math.round(timeInput * secondsInDay);
+    }
     let timeStr = String(timeInput).trim();
     const durationMatch = timeStr.match(/^(\d+):(\d{2}):(\d{2})$/);
     if (durationMatch) {
-        const [, hoursStr, minutesStr, secondsStr] = durationMatch;
-        const h = parseInt(hoursStr, 10);
-        const m = parseInt(minutesStr, 10);
-        const s = parseInt(secondsStr, 10);
-         if (isNaN(h) || isNaN(m) || isNaN(s) || h < 0 || m < 0 || m > 59 || s < 0 || s > 59) {
-              return null;
-         }
-        const totalSeconds = h * 3600 + m * 60 + s;
-        return totalSeconds;
-    }
-     const minuteDurationMatch = timeStr.match(/^(\d+):(\d{2})$/);
-      if (minuteDurationMatch) {
-           const [, hoursStr, minutesStr] = minuteDurationMatch;
-           const h = parseInt(hoursStr, 10);
-           const m = parseInt(minutesStr, 10);
-            if (isNaN(h) || isNaN(m) || h < 0 || m < 0 || m > 59) {
-                 return null;
-            }
-           const totalSeconds = h * 3600 + m * 60;
-           return totalSeconds;
+      const [, hoursStr, minutesStr, secondsStr] = durationMatch;
+      const h = parseInt(hoursStr, 10);
+      const m = parseInt(minutesStr, 10);
+      const s = parseInt(secondsStr, 10);
+      if (isNaN(h) || isNaN(m) || isNaN(s) || h < 0 || m < 0 || m > 59 || s < 0 || s > 59) {
+        return null;
       }
+      const totalSeconds = h * 3600 + m * 60 + s;
+      return totalSeconds;
+    }
+    const minuteDurationMatch = timeStr.match(/^(\d+):(\d{2})$/);
+    if (minuteDurationMatch) {
+      const [, hoursStr, minutesStr] = minuteDurationMatch;
+      const h = parseInt(hoursStr, 10);
+      const m = parseInt(minutesStr, 10);
+      if (isNaN(h) || isNaN(m) || h < 0 || m < 0 || m > 59) {
+        return null;
+      }
+      const totalSeconds = h * 3600 + m * 60;
+      return totalSeconds;
+    }
     return null;
   };
 
@@ -202,52 +167,52 @@ function FileUpload({ onUploadComplete }) {
             const rawUserGroup = rawRowFormatted[headerMap.user_group];
             const rawOperator = rawRowFormatted[headerMap.operator_name];
             const rawTabulation = rawRowFormatted[headerMap.tabulation];
-            record.call_timestamp = parseFlexibleDateTime(rawTimestamp);
+            record.call_timestamp = formatExcelDateToISO(rawTimestamp);
             if (record.call_timestamp === null) {
               rowErrors.push(`Data/Hora inválida ("${rawTimestamp}")`);
               rowHasError = true;
             }
             let parsedDuration = null;
             if (typeof rawDurationRaw === 'number' && rawDurationRaw >= 0 && rawDurationRaw < 1) {
-                const secondsInDay = 24 * 60 * 60;
-                parsedDuration = Math.round(rawDurationRaw * secondsInDay);
+              const secondsInDay = 24 * 60 * 60;
+              parsedDuration = Math.round(rawDurationRaw * secondsInDay);
             } else {
-                 parsedDuration = timeToSeconds(rawDurationFormatted);
+              parsedDuration = timeToSeconds(rawDurationFormatted);
             }
             record.duration_seconds = parsedDuration;
             if (record.duration_seconds === null) {
-                 rowErrors.push(`Duração inválida ("${rawDurationFormatted}" / raw: ${rawDurationRaw})`);
-                 rowHasError = true;
+              rowErrors.push(`Duração inválida ("${rawDurationFormatted}" / raw: ${rawDurationRaw})`);
+              rowHasError = true;
             } else if (record.duration_seconds < 0) {
-                 rowErrors.push(`Duração negativa ("${rawDurationFormatted}" / raw: ${rawDurationRaw})`);
-                 rowHasError = true;
+              rowErrors.push(`Duração negativa ("${rawDurationFormatted}" / raw: ${rawDurationRaw})`);
+              rowHasError = true;
             }
             record.cpf_cnpj = rawCpfCnpj ? String(rawCpfCnpj).trim() : null;
             record.uf = rawUf ? String(rawUf).trim().toUpperCase() : null;
             record.user_group = rawUserGroup ? String(rawUserGroup).trim() : null;
             record.operator_name = rawOperator ? String(rawOperator).trim() : null;
             record.tabulation = rawTabulation ? String(rawTabulation).trim() : null;
-             if (!record.uf) {
-                 rowErrors.push(`UF ausente.`);
-                 rowHasError = true;
-             }
-             if (!record.user_group) {
-                  rowErrors.push(`Grupo Usuário ausente.`);
-                  rowHasError = true;
-             }
-             if (!record.operator_name) {
-                  rowErrors.push(`Operador ausente.`);
-                  rowHasError = true;
-             }
-             if (!record.tabulation) {
-                  rowErrors.push(`Tabulação ausente.`);
-                  rowHasError = true;
-             }
+            if (!record.uf) {
+              rowErrors.push(`UF ausente.`);
+              rowHasError = true;
+            }
+            if (!record.user_group) {
+              rowErrors.push(`Grupo Usuário ausente.`);
+              rowHasError = true;
+            }
+            if (!record.operator_name) {
+              rowErrors.push(`Operador ausente.`);
+              rowHasError = true;
+            }
+            if (!record.tabulation) {
+              rowErrors.push(`Tabulação ausente.`);
+              rowHasError = true;
+            }
             if (rowHasError) {
-                validationErrors.push(`Linha ${rowNum}: ${rowErrors.join(', ')}`);
-                 return null;
+              validationErrors.push(`Linha ${rowNum}: ${rowErrors.join(', ')}`);
+              return null;
             } else {
-                 return record;
+              return record;
             }
           })
           .filter((record) => record !== null);
@@ -263,44 +228,44 @@ function FileUpload({ onUploadComplete }) {
             .join('\n')}${
             validationErrors.length > 10 ? `\n...e mais ${validationErrors.length - 10}.` : ''
           }`;
-           setMessage({
-               text: errorMsg + (validRowsCount > 0 ? `\nEnviando ${validRowsCount} registros válidos...` : ''),
-               type: validRowsCount > 0 ? 'warning' : 'error',
-            });
+          setMessage({
+            text: errorMsg + (validRowsCount > 0 ? `\nEnviando ${validRowsCount} registros válidos...` : ''),
+            type: validRowsCount > 0 ? 'warning' : 'error',
+          });
         }
         if (validRowsCount > 0) {
-           if (validationErrors.length === 0) {
-                setMessage({
-                   text: `Enviando ${validRowsCount} registros para o banco de dados...`,
-                   type: 'info',
-                });
-           }
+          if (validationErrors.length === 0) {
+            setMessage({
+              text: `Enviando ${validRowsCount} registros para o banco de dados...`,
+              type: 'info',
+            });
+          }
           const { error } = await insertCallRecords(transformedData);
           if (error) {
-               const dbErrorMsg = `Erro ao inserir registros no banco: ${error.message}`;
-               if (validationErrors.length > 0) {
-                    setMessage(prev => ({
-                         text: prev.text + `\n${dbErrorMsg}`,
-                         type: 'error'
-                    }));
-               } else {
-                    setMessage({ text: dbErrorMsg, type: 'error' });
-               }
-               throw error;
+            const dbErrorMsg = `Erro ao inserir registros no banco: ${error.message}`;
+            if (validationErrors.length > 0) {
+              setMessage(prev => ({
+                text: prev.text + `\n${dbErrorMsg}`,
+                type: 'error'
+              }));
+            } else {
+              setMessage({ text: dbErrorMsg, type: 'error' });
+            }
+            throw error;
           }
           const successMessage = `${validRowsCount} registros importados com sucesso!`;
           const summaryMessage = validationErrors.length > 0
-              ? `${successMessage} (${ignoredRowsCount} inválidos ignorados).`
-              : successMessage;
+            ? `${successMessage} (${ignoredRowsCount} inválidos ignorados).`
+            : successMessage;
           setMessage({
             text: summaryMessage,
             type: 'success',
           });
         } else if (validationErrors.length === 0) {
-             setMessage({
-                 text: 'O arquivo não contém dados válidos para importação após o cabeçalho.',
-                 type: 'error'
-            });
+          setMessage({
+            text: 'O arquivo não contém dados válidos para importação após o cabeçalho.',
+            type: 'error'
+          });
         }
         setSelectedFile(null);
         if (document.getElementById('file-upload-input')) {
@@ -311,9 +276,9 @@ function FileUpload({ onUploadComplete }) {
         }
       } catch (err) {
         if (!message.text.includes('Erro:')) {
-             setMessage({ text: `Erro: ${err.message}`, type: 'error' });
+          setMessage({ text: `Erro: ${err.message}`, type: 'error' });
         } else if (message.type !== 'error') {
-             setMessage(prev => ({ ...prev, type: 'error' }));
+          setMessage(prev => ({ ...prev, type: 'error' }));
         }
       } finally {
         setIsLoading(false);
@@ -331,9 +296,9 @@ function FileUpload({ onUploadComplete }) {
         <label
           htmlFor="file-upload-input"
           className={`btn btn-secondary flex-shrink-0 ${
-             isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+            isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
           }`}
-          title={ isLoading ? 'Processando...' : 'Selecionar arquivo Excel ou CSV' }
+          title={isLoading ? 'Processando...' : 'Selecionar arquivo Excel ou CSV'}
         >
           <i className="fas fa-file-excel mr-2"></i> Selecionar Arquivo
           <input
@@ -394,4 +359,5 @@ function FileUpload({ onUploadComplete }) {
     </div>
   );
 }
+
 export default FileUpload;

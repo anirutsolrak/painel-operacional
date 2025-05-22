@@ -46,6 +46,34 @@ function getSupabaseClient() {
 
 export default getSupabaseClient;
 
+async function fetchAllPages(query) {
+    const pageSize = 1000;
+    let allData = [];
+    let hasMore = true;
+    let currentPage = 0;
+
+    while (hasMore) {
+        const start = currentPage * pageSize;
+        const { data, error } = await query
+            .range(start, start + pageSize - 1);
+
+        if (error) throw error;
+        
+        if (!data || data.length === 0) {
+            hasMore = false;
+        } else {
+            allData = [...allData, ...data];
+            if (data.length < pageSize) {
+                hasMore = false;
+            } else {
+                currentPage++;
+            }
+        }
+    }
+
+    return allData;
+}
+
 export async function insertCallRecords(records) {
     if (!records?.length) {
         return { data: null, error: new Error("Nenhum registro fornecido") };
@@ -93,11 +121,12 @@ export async function fetchDashboardMetricsWithTrend(filters) {
         if (filters.currentFilters.filter_operator_name) {
             currentQuery = currentQuery.eq('operator_name', filters.currentFilters.filter_operator_name);
         }
-         if (filters.currentFilters.filter_region_ufs && filters.currentFilters.filter_region_ufs.length > 0) {
-             currentQuery = currentQuery.in('uf', filters.currentFilters.filter_region_ufs);
+        if (filters.currentFilters.filter_region_ufs && filters.currentFilters.filter_region_ufs.length > 0) {
+            currentQuery = currentQuery.in('uf', filters.currentFilters.filter_region_ufs);
         }
-        const { data: currentData, error: currentError } = await currentQuery;
-        if (currentError) throw currentError;
+
+        const currentData = await fetchAllPages(currentQuery);
+
         let previousQuery = supabase.from('call_records').select('*');
         if (filters.previousFilters.start_date && filters.previousFilters.start_date !== '') {
             previousQuery = previousQuery.gte('call_timestamp', filters.previousFilters.start_date);
@@ -111,13 +140,15 @@ export async function fetchDashboardMetricsWithTrend(filters) {
         if (filters.previousFilters.filter_operator_name) {
             previousQuery = previousQuery.eq('operator_name', filters.previousFilters.filter_operator_name);
         }
-         if (filters.previousFilters.filter_region_ufs && filters.previousFilters.filter_region_ufs.length > 0) {
-             previousQuery = previousQuery.in('uf', filters.previousFilters.filter_region_ufs);
+        if (filters.previousFilters.filter_region_ufs && filters.previousFilters.filter_region_ufs.length > 0) {
+            previousQuery = previousQuery.in('uf', filters.previousFilters.filter_region_ufs);
         }
-        const { data: previousData, error: previousError } = await previousQuery;
-        if (previousError) throw previousError;
+
+        const previousData = await fetchAllPages(previousQuery);
+
         const currentMetrics = processMetrics(currentData || []);
         const previousMetrics = processMetrics(previousData || []);
+
         return {
             current: currentMetrics,
             previous: previousMetrics,
@@ -144,35 +175,52 @@ function processMetrics(data) {
             taxaNaoEfetivo: 0
         };
     }
+
     const totalCalls = data.length;
     const attendedCalls = data.filter(call => call.duration_seconds > 0).length;
     const abandonedCalls = data.filter(call => call.duration_seconds === 0).length;
-    const failedCalls = data.filter(call => !call.duration_seconds).length;
+
+    const naoEfetivoTabulations = [
+        'cliente ausente',
+        'cliente desligou',
+        'ligação caiu',
+        'ligação muda',
+        'caixa postal'
+    ];
+
+    const naoEfetivoCalls = data.filter(call =>
+        call.tabulation &&
+        naoEfetivoTabulations.includes(call.tabulation.toLowerCase())
+    ).length;
+
     const successfulTabulations = data.filter(call =>
         call.tabulation &&
-        !['telefone incorreto', 'recusa', 'agendamento grupo', 'caixa postal', 'ligação caiu',
-         'cliente ausente', 'cliente desligou', 'ligação muda'].includes(call.tabulation.toLowerCase())
+        call.tabulation.toLowerCase() === 'endereço confirmado'
     ).length;
-    const totalDuration = data.reduce((sum, call) => sum + (call.duration_seconds || 0), 0);
-    const averageCallDuration = attendedCalls > 0 ? totalDuration / attendedCalls : 0;
-    const lostTimeTabulations = ['telefone incorreto', 'recusa', 'agendamento grupo', 'caixa postal',
-                                'ligação caiu', 'cliente ausente', 'cliente desligou', 'ligação muda'];
-    const lostTimeCalls = data.filter(call =>
-        call.tabulation &&
-        lostTimeTabulations.includes(call.tabulation.toLowerCase())
-    );
-    const totalLostTime = lostTimeCalls.reduce((sum, call) => sum + (call.duration_seconds || 0), 0);
+
+    const attendedCallsDuration = data
+        .filter(call => call.duration_seconds > 0)
+        .reduce((sum, call) => sum + (call.duration_seconds || 0), 0);
+    const averageCallDuration = attendedCalls > 0 ? attendedCallsDuration / attendedCalls : 0;
+
+    const totalLostTime = data
+        .filter(call => 
+            call.tabulation &&
+            naoEfetivoTabulations.includes(call.tabulation.toLowerCase())
+        )
+        .reduce((sum, call) => sum + (call.duration_seconds || 0), 0);
+
     return {
         totalLigações: totalCalls,
         ligaçõesAtendidasCount: attendedCalls,
         ligaçõesAbandonadasCount: abandonedCalls,
-        ligaçõesFalhaCount: failedCalls,
+        ligaçõesFalhaCount: naoEfetivoCalls,
         sucessoTabulacoesCount: successfulTabulations,
         tempoPerdidoSegundos: totalLostTime,
         tma: averageCallDuration,
         taxaSucesso: totalCalls > 0 ? successfulTabulations / totalCalls : 0,
         taxaAbandono: totalCalls > 0 ? abandonedCalls / totalCalls : 0,
-        taxaNaoEfetivo: totalCalls > 0 ? failedCalls / totalCalls : 0
+        taxaNaoEfetivo: totalCalls > 0 ? naoEfetivoCalls / totalCalls : 0
     };
 }
 
@@ -192,11 +240,11 @@ export async function fetchStatusDistribution(filters) {
         if (filters.filter_operator_name) {
             query = query.eq('operator_name', filters.filter_operator_name);
         }
-         if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
-             query = query.in('uf', filters.filter_region_ufs);
+        if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
+            query = query.in('uf', filters.filter_region_ufs);
         }
-        const { data, error } = await query;
-        if (error) throw error;
+
+        const data = await fetchAllPages(query);
         const distribution = processStatusDistribution(data || []);
         return { data: distribution, error: null };
     } catch (error) {
@@ -232,11 +280,11 @@ export async function fetchHourlyCallCounts(filters) {
         if (filters.filter_operator_name) {
             query = query.eq('operator_name', filters.filter_operator_name);
         }
-         if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
-             query = query.in('uf', filters.filter_region_ufs);
+        if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
+            query = query.in('uf', filters.filter_region_ufs);
         }
-        const { data, error } = await query;
-        if (error) throw error;
+
+        const data = await fetchAllPages(query);
         const hourlyData = processHourlyData(data || []);
         return { data: hourlyData, error: null };
     } catch (error) {
@@ -247,8 +295,10 @@ export async function fetchHourlyCallCounts(filters) {
 function processHourlyData(data) {
     const hourlyCount = Array(24).fill(0);
     data.forEach(record => {
-        const hour = new Date(record.call_timestamp).getHours();
-        hourlyCount[hour]++;
+        if (record.call_timestamp) {
+            const hour = new Date(record.call_timestamp).getHours();
+            hourlyCount[hour]++;
+        }
     });
     return hourlyCount.map((chamadas, hora) => ({ hora, chamadas }));
 }
@@ -269,11 +319,11 @@ export async function fetchTabulationDistribution(filters) {
         if (filters.filter_operator_name) {
             query = query.eq('operator_name', filters.filter_operator_name);
         }
-         if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
-             query = query.in('uf', filters.filter_region_ufs);
+        if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
+            query = query.in('uf', filters.filter_region_ufs);
         }
-        const { data, error } = await query;
-        if (error) throw error;
+
+        const data = await fetchAllPages(query);
         const distribution = processTabulationDistribution(data || []);
         return { data: distribution, error: null };
     } catch (error) {
@@ -284,7 +334,8 @@ export async function fetchTabulationDistribution(filters) {
 function processTabulationDistribution(data) {
     const tabulationCount = data.reduce((acc, record) => {
         if (record.tabulation) {
-            acc[record.tabulation] = (acc[record.tabulation] || 0) + 1;
+            const tabulation = record.tabulation.trim();
+            acc[tabulation] = (acc[tabulation] || 0) + 1;
         }
         return acc;
     }, {});
@@ -306,11 +357,11 @@ export async function fetchStateMapData(filters) {
         if (filters.filter_operator_name) {
             query = query.eq('operator_name', filters.filter_operator_name);
         }
-         if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
-             query = query.in('uf', filters.filter_region_ufs);
+        if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
+            query = query.in('uf', filters.filter_region_ufs);
         }
-        const { data, error } = await query;
-        if (error) throw error;
+
+        const data = await fetchAllPages(query);
         const stateData = processStateMapData(data || []);
         return { data: stateData, error: null };
     } catch (error) {
@@ -330,10 +381,7 @@ function processStateMapData(data) {
             };
         }
         stateMetrics[record.uf].totalLigações++;
-        if (record.tabulation &&
-            !['telefone incorreto', 'recusa', 'agendamento grupo', 'caixa postal',
-              'ligação caiu', 'cliente ausente', 'cliente desligou', 'ligação muda']
-                .includes(record.tabulation.toLowerCase())) {
+        if (record.tabulation && record.tabulation.toLowerCase() === 'endereço confirmado') {
             stateMetrics[record.uf].sucessoTabulacoesCount++;
         }
     });
@@ -350,23 +398,18 @@ export async function fetchOperators() {
         const { data, error } = await supabase.rpc('get_distinct_operators');
 
         if (error) {
-             console.error("[fetchOperators] RPC 'get_distinct_operators' error:", error);
-             throw error;
+            console.error("[fetchOperators] RPC 'get_distinct_operators' error:", error);
+            throw error;
         }
 
         let processedOperators = [];
-        // A RPC retorna um array de objetos, onde cada objeto tem a chave 'operator_name'
-        // como confirmado pelo teste no Studio.
         if (Array.isArray(data)) {
-             processedOperators = data.map(item => ({ id: item.operator_name, operator_name: item.operator_name }));
+            processedOperators = data.map(item => ({ id: item.operator_name, operator_name: item.operator_name }));
         } else {
-             console.warn("[fetchOperators] RPC 'get_distinct_operators' did not return an array as expected:", data);
+            console.warn("[fetchOperators] RPC 'get_distinct_operators' did not return an array as expected:", data);
         }
 
-         // A validação opcional de trim() estava causando o erro porque 'op' já era um objeto
-         // e não uma string. A validação agora verifica se o nome existe e não é uma string vazia após trim.
-         processedOperators = processedOperators.filter(op => op && typeof op.operator_name === 'string' && op.operator_name.trim() !== '');
-
+        processedOperators = processedOperators.filter(op => op && typeof op.operator_name === 'string' && op.operator_name.trim() !== '');
 
         return {
             data: processedOperators,
@@ -377,7 +420,6 @@ export async function fetchOperators() {
         return { data: [], error };
     }
 }
-
 
 export async function fetchUfRegions() {
     const supabase = getSupabaseClient();
