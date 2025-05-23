@@ -154,7 +154,7 @@ function Dashboard({ onLogout, user }) {
       end_date: dateParams.current_end_date,
       filter_state: filters.state === 'all' ? null : filters.state,
       filter_operator_name: operatorNameFilter,
-      filter_region_ufs: filters.region === 'all' ? null : regionUfs.length > 0 ? regionUfs : ['INVALID_STATE'], // Pass UFs for region filter
+      filter_region_ufs: filters.region === 'all' ? null : regionUfs.length > 0 ? regionUfs : ['INVALID_STATE'],
     };
 
      const previousFilters = {
@@ -162,7 +162,7 @@ function Dashboard({ onLogout, user }) {
          end_date: dateParams.previous_end_date,
          filter_state: filters.state === 'all' ? null : filters.state,
          filter_operator_name: operatorNameFilter,
-         filter_region_ufs: filters.region === 'all' ? null : regionUfs.length > 0 ? regionUfs : ['INVALID_STATE'], // Pass UFs for region filter
+         filter_region_ufs: filters.region === 'all' ? null : regionUfs.length > 0 ? regionUfs : ['INVALID_STATE'],
      }
 
     setIsLoadingData(true);
@@ -193,6 +193,7 @@ function Dashboard({ onLogout, user }) {
         previous: metricsResult.previous,
       });
       setTabulationDistributionNav(tabulationDistributionResult.data || []);
+      console.log("📊 [Dashboard] tabulationDistributionNav data recebida:", tabulationDistributionResult.data);
 
       let stateMapDataTransformed = {};
       if (Array.isArray(stateMapResult.data)) {
@@ -232,7 +233,7 @@ function Dashboard({ onLogout, user }) {
          end_date: dateParams.current_end_date,
          filter_state: null,
          filter_operator_name: null,
-         filter_region_ufs: null, // No region filter in exhibition mode
+         filter_region_ufs: null,
      };
 
     const previousDateParams = dataUtils.getDateRangeParams(exhibitionDateRange);
@@ -242,7 +243,7 @@ function Dashboard({ onLogout, user }) {
          end_date: previousDateParams.previous_end_date,
          filter_state: null,
          filter_operator_name: null,
-         filter_region_ufs: null, // No region filter in exhibition mode
+         filter_region_ufs: null,
     };
 
     try {
@@ -270,6 +271,7 @@ function Dashboard({ onLogout, user }) {
       });
       setHourlyDataToday(hourlyDataExhibitionResult.data || []);
       setTabulationDistributionToday(tabulationDistributionExhibitionResult.data || []);
+      console.log("📊 [Dashboard] tabulationDistributionToday data recebida:", tabulationDistributionExhibitionResult.data);
 
     } catch (err) {
       console.error("📊 [Dashboard] Erro geral ao carregar dados de Exibição:", err);
@@ -313,11 +315,9 @@ function Dashboard({ onLogout, user }) {
       if ((operatorsList.length > 0 || selectedOperatorId === 'all') && ufRegionsData.length > 0) {
         fetchDataForFilters();
       } else if (!isLoadingData && ufRegionsData.length === 0 && operatorsList.length === 0) {
-         // Keep loading state if lists are still empty
          setIsLoadingData(true);
-         setErrorData(null); // Clear previous error if fetching lists failed
+         setErrorData(null);
       } else if (!isLoadingData && (ufRegionsData.length > 0 || operatorsList.length > 0)) {
-           // Lists fetched, but no data yet, trigger fetch
            fetchDataForFilters();
       }
     }
@@ -344,16 +344,17 @@ function Dashboard({ onLogout, user }) {
       'ligação muda'
   ].map(tab => tab.toLowerCase()), []);
 
-  const validTabulationDataNav = useMemo(() => {
-      if (!tabulationDistributionNav) return [];
-      const filteredData = tabulationDistributionNav.filter(item => {
-          const lowerTab = item.tabulation ? String(item.tabulation).trim().toLowerCase() : '';
-          return lowerTab !== 'endereço confirmado' && !tempoPerdidoTabulations.includes(lowerTab);
-      });
-      return filteredData
-          .sort((a, b) => b.count - a.count)
-          .map(d => ({ label: d.tabulation, value: d.count }));
-  }, [tabulationDistributionNav, tempoPerdidoTabulations]);
+   const validTabulationDataNav = useMemo(() => {
+       if (!tabulationDistributionNav) return [];
+       console.log("📊 [Dashboard] Processando validTabulationDataNav. tabulationDistributionNav:", tabulationDistributionNav);
+       // Mudar d.total_count para d.count
+       const processedData = tabulationDistributionNav
+           .filter(d => (d.count || 0) > 0) 
+           .sort((a, b) => (b.count || 0) - (a.count || 0)) 
+           .map(d => ({ label: d.tabulation, value: d.count || 0 })); 
+       console.log("📊 [Dashboard] validTabulationDataNav processado:", processedData);
+       return processedData;
+   }, [tabulationDistributionNav]);
 
    const showTabulationPlaceholderNav = !tabulationDistributionNav || tabulationDistributionNav.length === 0 || validTabulationDataNav.length === 0;
 
@@ -403,7 +404,7 @@ function Dashboard({ onLogout, user }) {
               </div>
             ) : (
               <>
-                <OperationsOverview currentMetrics={metrics.current} previousMetrics={metrics.previous} />
+            
                 <PerformanceMetrics
                   metrics={metrics.current}
                   timeSeriesData={hourlyData}
@@ -417,12 +418,12 @@ function Dashboard({ onLogout, user }) {
                      className="bg-white rounded-lg shadow-md border border-slate-200 p-6 flex flex-col"
                    >
                      <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                       Distribuição por Tabulação (Atendidas Válidas)
+                       Distribuição por Tabulação (Volume Total)
                      </h3>
                      <div className="flex-grow relative" style={{ height: '320px' }}>
                        {showTabulationPlaceholderNav ? (
                          <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-                           Sem dados de tabulação válida para o período/filters selecionados.
+                           Sem dados de tabulação para o período/filtros selecionados.
                          </div>
                        ) : (
                          <BarChart
@@ -479,7 +480,7 @@ function Dashboard({ onLogout, user }) {
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-                          Sem dados geográficos para o período/filters selecionados.
+                          Sem dados geográficos para o período/filtros selecionados.
                         </div>
                       )}
                     </div>
@@ -518,6 +519,22 @@ function Dashboard({ onLogout, user }) {
                 selectedDateRange={exhibitionDateRange}
                 isLoading={isLoadingData}
                 error={errorData}
+                BrazilMapComponent={
+                     Object.keys(stateMapData).length > 0 ? (
+                        <BrazilMap
+                           data={stateMapData}
+                           displayMode={displayMode}
+                           selectedMetric={selectedMapMetric}
+                           selectedMapRegion={selectedMapRegion}
+                           metricOptions={mapMetricOptions}
+                           ufRegionsData={ufRegionsData}
+                        />
+                     ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-slate-500">
+                           Sem dados geográficos para o período/filtros selecionados.
+                        </div>
+                     )
+                }
             />
           </main>
         )}

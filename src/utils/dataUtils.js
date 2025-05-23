@@ -2,9 +2,9 @@ import {
   fetchDashboardMetricsWithTrend,
   fetchStatusDistribution,
   fetchHourlyCallCounts,
-  fetchTabulationDistribution,
+  fetchTabulationDistribution, // Esta é a função que precisa ser verificada no supabaseClient.js
   fetchStateMapData,
-  fetchOperators, // Importar a versão que chama a RPC
+  fetchOperators,
   fetchUfRegions
 } from './supabaseClient';
 
@@ -156,7 +156,7 @@ function getDateRangeParams(dateRange, customStartDate = null, customEndDate = n
 const getPerformanceMetrics = fetchDashboardMetricsWithTrend;
 const getTimeSeriesData = fetchHourlyCallCounts;
 const getStatusDistribution = fetchStatusDistribution;
-const getTabulationDistribution = fetchTabulationDistribution;
+const getTabulationDistribution = fetchTabulationDistribution; // Esta função precisa ser verificada no supabaseClient.js
 const getStateData = fetchStateMapData;
 const getOperators = fetchOperators;
 const getUfRegions = fetchUfRegions;

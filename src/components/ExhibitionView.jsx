@@ -1,24 +1,11 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import dataUtils from '../utils/dataUtils';
-import BarChart from '../components/charts/BarChart.jsx';
 import DoughnutChart from '../components/charts/DoughnutChart.jsx';
+import StackedBarChart from '../components/charts/StackedBarChart.jsx';
+import BarChart from '../components/charts/BarChart.jsx';
 
-function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistribution, goalValue, operatorsList, selectedOperatorId, KPI_Card, selectedDateRange, isLoading, error }) {
-    const tempoPerdidoTabulations = useMemo(() => [
-        'telefone incorreto',
-        'recusa',
-        'agendamento grupo',
-        'recusa cartão tel. não é do cliente - *ligar nos demais*',
-        'fidelizado/irá desbloquear',
-        'recusa/não tem interesse em desbloquear',
-        'caixa postal',
-        'ligação caiu',
-        'cliente ausente',
-        'cliente desligou',
-        'ligação muda'
-    ].map(tab => tab.toLowerCase()), []);
-
+function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistribution, goalValue, operatorsList, selectedOperatorId, KPI_Card, selectedDateRange, isLoading, error, BrazilMapComponent }) {
     const attendedVsOthersData = useMemo(() => {
         const attendedCount = metrics?.ligaçõesAtendidasCount || 0;
         const totalCalls = metrics?.totalLigações || 0;
@@ -30,24 +17,17 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
         return data;
     }, [metrics]);
 
-    const hourlyCallsData = useMemo(() => {
-        if (!hourlyData) return [];
-        const data = hourlyData.map(d => ({ label: `${d.hora.toString().padStart(2, '0')}:00`, value: d.chamadas }));
-        return data;
-    }, [hourlyData]);
-
-    const topTabulationsData = useMemo(() => {
+    const tabulationTotalData = useMemo(() => {
         if (!tabulationDistribution) return [];
-         const filteredData = tabulationDistribution.filter(item => {
-             const lowerTab = item.tabulation ? String(item.tabulation).trim().toLowerCase() : '';
-             return lowerTab !== 'endereço confirmado' && !tempoPerdidoTabulations.includes(lowerTab);
-         });
-         const data = filteredData
-             .sort((a, b) => b.count - a.count)
-             .slice(0, 5)
-             .map(d => ({ label: d.tabulation, value: d.count }));
-        return data;
-      }, [tabulationDistribution, tempoPerdidoTabulations]);
+        // Mudar d.total_count para d.count
+        return tabulationDistribution
+            .map(d => ({
+                label: d.tabulation,
+                value: d.count || 0, 
+            }))
+            .filter(d => d.value > 0)
+            .sort((a, b) => b.value - a.value); 
+    }, [tabulationDistribution]);
 
     const isOperatorSelected = selectedOperatorId !== 'all';
     const metaTitle = isOperatorSelected ? `Meta Operador` : `Meta Logística`;
@@ -133,11 +113,9 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
      const tmaTrend = dataUtils.calculateTrend(metrics?.tma, previousMetrics?.tma);
 
     const hasMetricsData = metrics && (metrics.totalLigações > 0 || metrics.ligaçõesAtendidasCount > 0 || metrics.ligaçõesAbandonadasCount > 0 || metrics.ligaçõesFalhaCount > 0 || metrics.sucessoTabulacoesCount > 0);
-    const hasHourlyData = hourlyCallsData.length > 0;
-    const hasTabulationData = topTabulationsData.length > 0;
+    const hasTabulationData = tabulationTotalData.length > 0;
 
     const showMetricsPlaceholder = !isLoading && !error && !hasMetricsData;
-    const showHourlyPlaceholder = !isLoading && !error && !hasHourlyData;
     const showTabulationPlaceholder = !isLoading && !error && !hasTabulationData;
 
     const dateRangeSuffix = selectedDateRange === 'today' ? '(Hoje)' : selectedDateRange === 'week' ? '(Últimos 7 Dias)' : '';
@@ -262,36 +240,36 @@ function ExhibitionView({ metrics, previousMetrics, hourlyData, tabulationDistri
                      </div>
                    </motion.div>
                 </div>
-                <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6 flex flex-col h-full">
-                    <h3 className="text-base lg:text-lg font-semibold text-slate-800 mb-3">Volume por Hora {dateRangeSuffix} (08-20h)</h3>
-                    <div className="flex-grow relative min-h-[250px]">
-                         {showHourlyPlaceholder ? (
-                              <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-                                 Sem dados horários para o período/filters selecionados.
-                              </div>
-                         ) : (
-                            <BarChart data={hourlyCallsData} title="" horizontal={false} />
-                         )}
-                    </div>
-                </div>
             </div>
-             <div className="grid grid-cols-1 mb-8">
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                  <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6 flex flex-col">
-                     <h3 className="text-lg font-semibold text-slate-800 mb-4">Top 5 Motivos {dateRangeSuffix}</h3>
+                     <h3 className="text-lg font-semibold text-slate-800 mb-4">
+                        Distribuição por Tabulação (Volume Total) {dateRangeSuffix}
+                     </h3>
                      <div className="flex-grow relative min-h-[300px]">
                          {showTabulationPlaceholder ? (
                               <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-                                  Sem dados de tabulação para o período/filters selecionados.
+                                  Sem dados de tabulação para o período/filtros selecionados.
                               </div>
                          ) : (
                              <BarChart
-                                 data={topTabulationsData}
+                                 data={tabulationTotalData}
                                  horizontal={true}
                                  title=""
                              />
                          )}
                      </div>
                  </div>
+                <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6 flex flex-col">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-4">Distribuição Geográfica (Volume de Chamadas)</h3>
+                    <div className="flex-grow relative min-h-[300px]">
+                        {BrazilMapComponent ? BrazilMapComponent : (
+                            <div className="absolute inset-0 flex items-center justify-center text-slate-500">
+                                Componente de Mapa não disponível.
+                            </div>
+                        )}
+                    </div>
+                </div>
              </div>
              </>
         )}
