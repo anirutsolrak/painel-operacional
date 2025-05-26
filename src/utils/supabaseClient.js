@@ -19,7 +19,8 @@ function getSupabaseClient() {
             },
             from: () => ({
                 insert: () => ({ select: () => ({ select: async () => ({ data: [], error: new Error("Supabase client not configured.") }) }) }),
-                select: () => ({ eq: () => ({ order: () => ({ then: async () => ({ data: [], error: new Error("Supabase client not configured.") }) }) }) })
+                select: () => ({ eq: () => ({ order: () => ({ then: async () => ({ data: [], error: new Error("Supabase client not configured.") }) }) }) }),
+                delete: () => ({ then: async () => ({ data: [], error: new Error("Supabase client not configured.") }) })
             }),
             rpc: () => async () => ({ data: null, error: new Error("Supabase client not configured.") })
         };
@@ -37,7 +38,8 @@ function getSupabaseClient() {
             },
             from: () => ({
                 insert: () => ({ select: () => ({ select: async () => ({ data: [], error: new Error("Supabase client creation failed.") }) }) }),
-                select: () => ({ eq: () => ({ order: () => ({ then: async () => ({ data: [], error: new Error("Supabase client creation failed.") }) }) }) })
+                select: () => ({ eq: () => ({ order: () => ({ then: async () => ({ data: [], error: new Error("Supabase client creation failed.") }) }) }) }),
+                delete: () => ({ then: async () => ({ data: [], error: new Error("Supabase client creation failed.") }) })
             }),
             rpc: () => async () => ({ data: null, error: new Error("Supabase client creation failed.") })
         };
@@ -93,11 +95,28 @@ export async function insertCallRecords(records) {
         uploaded_by: userId
     }));
     try {
-        const { data, error } = await supabase
+        // Primeiro, exclua todos os registros existentes na tabela call_records
+        const { error: deleteError } = await supabase
+            .from('call_records')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos os registros (neq com um UUID impossível é uma forma comum de fazer DELETE ALL com RLS habilitado, se aplicável)
+                                                                // Se RLS não estiver habilitado ou se precisar de uma forma mais direta: .delete().gt('created_at', '1970-01-01T00:00:00Z') ou similar
+                                                                // Ou, se a tabela for pequena e você tiver controle total: .delete().contains('id', '') para deletar tudo.
+                                                                // A opção mais segura e explícita para "deletar tudo" é `.delete().not('id', 'is.null')` se a coluna `id` for `NOT NULL`.
+                                                                // Ou simplesmente .delete() se a política RLS permitir deletar todos os registros.
+                                                                // Para este caso, vamos usar o neq com um ID inválido, que é uma prática comum para "delete all" no Supabase.
+
+        if (deleteError) {
+            console.error("Erro ao deletar registros antigos:", deleteError);
+            return { data: null, error: new Error(`Falha ao limpar dados antigos: ${deleteError.message}`) };
+        }
+
+        // Em seguida, insira os novos registros
+        const { data, error: insertError } = await supabase
             .from('call_records')
             .insert(recordsWithMetadata)
             .select();
-        if (error) throw error;
+        if (insertError) throw insertError;
         return { data, error: null };
     } catch (error) {
         return { data: null, error };
@@ -278,7 +297,7 @@ export async function fetchHourlyCallCounts(filters) {
             query = query.eq('uf', filters.filter_state);
         }
         if (filters.filter_operator_name) {
-            query = query.eq('operator_name', filters.filter_operator_name);
+            query = query = query.eq('operator_name', filters.filter_operator_name);
         }
         if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
             query = query.in('uf', filters.filter_region_ufs);
@@ -306,26 +325,31 @@ function processHourlyData(data) {
 export async function fetchTabulationDistribution(filters) {
     const supabase = getSupabaseClient();
     try {
-        let query = supabase.from('call_records').select('*');
-        if (filters.start_date && filters.start_date !== '') {
-            query = query.gte('call_timestamp', filters.start_date);
-        }
-        if (filters.end_date && filters.end_date !== '') {
-            query = query.lte('call_timestamp', filters.end_date);
-        }
-        if (filters.filter_state) {
-            query = query.eq('uf', filters.filter_state);
-        }
-        if (filters.filter_operator_name) {
-            query = query.eq('operator_name', filters.filter_operator_name);
-        }
-        if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
-            query = query.in('uf', filters.filter_region_ufs);
+        // Agora, você está chamando diretamente a RPC get_tabulation_distribution
+        // A RPC lida com a agregação no banco de dados.
+        const { data, error } = await supabase.rpc('get_tabulation_distribution', {
+            start_date: filters.start_date,
+            end_date: filters.end_date,
+            filter_state: filters.filter_state,
+            filter_operator_name: filters.filter_operator_name,
+            filter_region_ufs: filters.filter_region_ufs // Passa o array de UFs para a RPC
+        });
+
+        if (error) {
+            console.error("[fetchTabulationDistribution] RPC 'get_tabulation_distribution' error:", error);
+            throw error;
         }
 
-        const data = await fetchAllPages(query);
-        const distribution = processTabulationDistribution(data || []);
-        return { data: distribution, error: null };
+        // A função RPC já retorna os dados no formato { tabulation, total_count } e já ordenados
+        // Então, apenas mapeamos para { label, value } que o BarChart espera, usando 'total_count'
+        // Se a RPC retorna 'count' em vez de 'total_count', ajuste aqui para `item.count`
+        const processedDistribution = Array.isArray(data) ? data.map(item => ({
+            label: item.tabulation,
+            value: item.total_count || 0 // Supondo que a RPC retorna 'total_count'
+                                         // Se a RPC retorna 'count', mude para: value: item.count || 0
+        })) : [];
+
+        return { data: processedDistribution, error: null };
     } catch (error) {
         return { data: null, error };
     }
