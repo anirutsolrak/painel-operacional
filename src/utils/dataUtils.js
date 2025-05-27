@@ -153,6 +153,27 @@ function getDateRangeParams(dateRange, customStartDate = null, customEndDate = n
   };
 }
 
+function processHourlyData(data) {
+    // Initialize array for business hours (8-20)
+    const businessHours = Array(13).fill(0); // 13 hours from 8 to 20
+    
+    data.forEach(record => {
+        if (record.call_timestamp) {
+            const hour = new Date(record.call_timestamp).getHours();
+            // Only count calls between 8:00 and 20:00
+            if (hour >= 8 && hour <= 20) {
+                businessHours[hour - 8]++; // Adjust index to start from 0
+            }
+        }
+    });
+    
+    // Map to array of objects with adjusted hour labels
+    return businessHours.map((chamadas, index) => ({
+        hora: index + 8, // Add 8 to get actual hour
+        chamadas
+    }));
+}
+
 const getPerformanceMetrics = fetchDashboardMetricsWithTrend;
 const getTimeSeriesData = fetchHourlyCallCounts;
 const getStatusDistribution = fetchStatusDistribution;
@@ -160,7 +181,6 @@ const getTabulationDistribution = fetchTabulationDistribution; // Esta função 
 const getStateData = fetchStateMapData;
 const getOperators = fetchOperators;
 const getUfRegions = fetchUfRegions;
-
 
 const dataUtils = {
   getPerformanceMetrics,

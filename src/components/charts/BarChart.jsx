@@ -19,8 +19,8 @@ function BarChart({ data, title, horizontal = false }) {
                 datasets: [{
                     label: title || 'Valor',
                     data: values,
-                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: data.map(d => d.color || 'rgba(59, 130, 246, 0.7)'),
+                    borderColor: data.map(d => d.color ? d.color.replace('0.7', '1') : 'rgb(59, 130, 246)'),
                     borderWidth: 1,
                     borderRadius: 3,
                 }]
@@ -106,7 +106,17 @@ function BarChart({ data, title, horizontal = false }) {
                             maxRotation: horizontal ? 0 : 45,
                             minRotation: horizontal ? 0 : 45,
                             font: { size: 10 },
-                            color: '#475569'
+                            color: '#475569',
+                            callback: function(value) {
+                                // Format hour labels for time series data
+                                if (value.toString().includes(':00')) {
+                                    return value;
+                                }
+                                if (!isNaN(value) && value >= 0 && value <= 23) {
+                                    return `${value.toString().padStart(2, '0')}:00`;
+                                }
+                                return value;
+                            }
                         }
                     }
                 },
@@ -116,10 +126,10 @@ function BarChart({ data, title, horizontal = false }) {
 
     useEffect(() => {
         if (!chartRef.current || !chartConfig) {
-             if (chartInstance.current) {
+            if (chartInstance.current) {
                 chartInstance.current.destroy();
                 chartInstance.current = null;
-             }
+            }
             return;
         }
         const ctx = chartRef.current.getContext('2d');

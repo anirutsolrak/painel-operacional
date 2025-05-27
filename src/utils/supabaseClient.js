@@ -312,14 +312,24 @@ export async function fetchHourlyCallCounts(filters) {
 }
 
 function processHourlyData(data) {
-    const hourlyCount = Array(24).fill(0);
+    // Initialize array for business hours (8-20)
+    const businessHours = Array(13).fill(0); // 13 hours from 8 to 20
+    
     data.forEach(record => {
         if (record.call_timestamp) {
             const hour = new Date(record.call_timestamp).getHours();
-            hourlyCount[hour]++;
+            // Only count calls between 8:00 and 20:00
+            if (hour >= 8 && hour <= 20) {
+                businessHours[hour - 8]++; // Adjust index to start from 0
+            }
         }
     });
-    return hourlyCount.map((chamadas, hora) => ({ hora, chamadas }));
+    
+    // Map to array of objects with adjusted hour labels
+    return businessHours.map((chamadas, index) => ({
+        hora: index + 8, // Add 8 to get actual hour
+        chamadas
+    }));
 }
 
 export async function fetchTabulationDistribution(filters) {

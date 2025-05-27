@@ -50,18 +50,23 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
     const callsRealized = metrics?.sucessoTabulacoesCount || 0;
     const callsRemaining = Math.max(0, calculatedGoalValue - callsRealized);
    const goalChartData = useMemo(() => {
-         if (calculatedGoalValue <= 0) return [];
-         if (callsRealized >= calculatedGoalValue && calculatedGoalValue > 0) {
-            return [
-               { label: 'End.Confirmado', value: calculatedGoalValue },
-               { label: 'Restante', value: 0 }
-            ];
-         }
-         return [
-             { label: 'End.Confirmado', value: callsRealized },
-             { label: 'Restante', value: callsRemaining }
-         ];
-   }, [calculatedGoalValue, callsRealized, callsRemaining]);
+    if (calculatedGoalValue <= 0) return [];
+    
+    const percentageAchieved = (callsRealized / calculatedGoalValue) * 100;
+    
+    if (percentageAchieved >= 100) {
+        return [{
+            label: 'Realizado',
+            value: percentageAchieved,
+            color: percentageAchieved > 100 ? '#f97316' : '#10b981'
+        }];
+    }
+    
+    return [
+        { label: 'Realizado', value: callsRealized, color: '#10b981' },
+        { label: 'Restante', value: callsRemaining, color: '#e5e7eb' }
+    ];
+}, [calculatedGoalValue, callsRealized, callsRemaining]);
    const percentageAchieved = useMemo(() => {
        if (calculatedGoalValue <= 0) return 0;
        const percentage = (callsRealized / calculatedGoalValue) * 100;
@@ -119,7 +124,7 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
                            <DoughnutChart
                              data={goalChartData}
                              title={metaTitle}
-                             colors={['#10b981', '#e5e7eb']}
+                             showOverachievement={true}
                            />
                        ) : (
                             <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-center px-4">
