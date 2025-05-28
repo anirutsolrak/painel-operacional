@@ -95,23 +95,16 @@ export async function insertCallRecords(records) {
         uploaded_by: userId
     }));
     try {
-        // Primeiro, exclua todos os registros existentes na tabela call_records
         const { error: deleteError } = await supabase
             .from('call_records')
             .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos os registros (neq com um UUID impossível é uma forma comum de fazer DELETE ALL com RLS habilitado, se aplicável)
-                                                                // Se RLS não estiver habilitado ou se precisar de uma forma mais direta: .delete().gt('created_at', '1970-01-01T00:00:00Z') ou similar
-                                                                // Ou, se a tabela for pequena e você tiver controle total: .delete().contains('id', '') para deletar tudo.
-                                                                // A opção mais segura e explícita para "deletar tudo" é `.delete().not('id', 'is.null')` se a coluna `id` for `NOT NULL`.
-                                                                // Ou simplesmente .delete() se a política RLS permitir deletar todos os registros.
-                                                                // Para este caso, vamos usar o neq com um ID inválido, que é uma prática comum para "delete all" no Supabase.
+            .neq('id', '00000000-0000-0000-0000-000000000000');
 
         if (deleteError) {
             console.error("Erro ao deletar registros antigos:", deleteError);
             return { data: null, error: new Error(`Falha ao limpar dados antigos: ${deleteError.message}`) };
         }
 
-        // Em seguida, insira os novos registros
         const { data, error: insertError } = await supabase
             .from('call_records')
             .insert(recordsWithMetadata)
@@ -286,63 +279,54 @@ function processStatusDistribution(data) {
 export async function fetchHourlyCallCounts(filters) {
     const supabase = getSupabaseClient();
     try {
-        let query = supabase.from('call_records').select('*');
-        if (filters.start_date && filters.start_date !== '') {
-            query = query.gte('call_timestamp', filters.start_date);
-        }
-        if (filters.end_date && filters.end_date !== '') {
-            query = query.lte('call_timestamp', filters.end_date);
-        }
-        if (filters.filter_state) {
-            query = query.eq('uf', filters.filter_state);
-        }
-        if (filters.filter_operator_name) {
-            query = query = query.eq('operator_name', filters.filter_operator_name);
-        }
-        if (filters.filter_region_ufs && filters.filter_region_ufs.length > 0) {
-            query = query.in('uf', filters.filter_region_ufs);
+        const { data, error } = await supabase.rpc('get_hourly_call_counts', {
+            start_date: filters.start_date,
+            end_date: filters.end_date,
+            filter_state: filters.filter_state,
+            filter_operator_name: filters.filter_operator_name,
+            filter_region_ufs: filters.filter_region_ufs
+        });
+
+        if (error) {
+            console.error("[fetchHourlyCallCounts] RPC error:", error);
+            throw error;
         }
 
-        const data = await fetchAllPages(query);
-        const hourlyData = processHourlyData(data || []);
-        return { data: hourlyData, error: null };
+        // Initialize array for all hours (0-23)
+        const hourlyData = Array.from({ length: 24 }, (_, i) => ({
+            hora: i,
+            chamadas: 0
+        }));
+
+        // Update counts from database results
+        if (Array.isArray(data)) {
+            data.forEach(item => {
+                const hour = parseInt(item.hour);
+                if (!isNaN(hour) && hour >= 0 && hour < 24) {
+                    hourlyData[hour].chamadas = parseInt(item.call_count) || 0;
+                }
+            });
+        }
+
+        // Filter to only return business hours (8-20)
+        const businessHourlyData = hourlyData.filter(item => item.hora >= 8 && item.hora <= 20);
+
+        return { data: businessHourlyData, error: null };
     } catch (error) {
-        return { data: null, error };
+        console.error('Error fetching hourly call counts:', error);
+        return { data: [], error };
     }
-}
-
-function processHourlyData(data) {
-    // Initialize array for business hours (8-20)
-    const businessHours = Array(13).fill(0); // 13 hours from 8 to 20
-    
-    data.forEach(record => {
-        if (record.call_timestamp) {
-            const hour = new Date(record.call_timestamp).getHours();
-            // Only count calls between 8:00 and 20:00
-            if (hour >= 8 && hour <= 20) {
-                businessHours[hour - 8]++; // Adjust index to start from 0
-            }
-        }
-    });
-    
-    // Map to array of objects with adjusted hour labels
-    return businessHours.map((chamadas, index) => ({
-        hora: index + 8, // Add 8 to get actual hour
-        chamadas
-    }));
 }
 
 export async function fetchTabulationDistribution(filters) {
     const supabase = getSupabaseClient();
     try {
-        // Agora, você está chamando diretamente a RPC get_tabulation_distribution
-        // A RPC lida com a agregação no banco de dados.
         const { data, error } = await supabase.rpc('get_tabulation_distribution', {
             start_date: filters.start_date,
             end_date: filters.end_date,
             filter_state: filters.filter_state,
             filter_operator_name: filters.filter_operator_name,
-            filter_region_ufs: filters.filter_region_ufs // Passa o array de UFs para a RPC
+            filter_region_ufs: filters.filter_region_ufs
         });
 
         if (error) {
@@ -350,13 +334,9 @@ export async function fetchTabulationDistribution(filters) {
             throw error;
         }
 
-        // A função RPC já retorna os dados no formato { tabulation, total_count } e já ordenados
-        // Então, apenas mapeamos para { label, value } que o BarChart espera, usando 'total_count'
-        // Se a RPC retorna 'count' em vez de 'total_count', ajuste aqui para `item.count`
         const processedDistribution = Array.isArray(data) ? data.map(item => ({
             label: item.tabulation,
-            value: item.total_count || 0 // Supondo que a RPC retorna 'total_count'
-                                         // Se a RPC retorna 'count', mude para: value: item.count || 0
+            value: item.total_count || 0
         })) : [];
 
         return { data: processedDistribution, error: null };
