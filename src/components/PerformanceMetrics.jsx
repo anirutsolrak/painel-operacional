@@ -9,6 +9,7 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
     if (!timeSeriesData) return [];
     return timeSeriesData.map(d => ({ label: `${d.hora.toString().padStart(2, '0')}:00`, value: d.chamadas }));
   }, [timeSeriesData]);
+
   const attendedVsOthersData = useMemo(() => {
      const attendedCount = metrics?.ligaçõesAtendidasCount || 0;
      const totalCalls = metrics?.totalLigações || 0;
@@ -18,24 +19,29 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
        { label: 'Outras', value: othersCount },
      ].filter(d => d.value > 0);
    }, [metrics]);
+
   const formattedTMA = useMemo(
     () => dataUtils.formatDuration(metrics?.tma),
     [metrics?.tma]
   );
-    const showMetricsPlaceholders = !metrics || (attendedVsOthersData.length === 0);
-    const showHourlyPlaceholder = !timeSeriesData || timeSeriesData.length === 0 || hourlyChartData.every(d => d.value === 0);
-   const isOperatorSelected = selectedOperatorId !== 'all';
-   const metaTitle = isOperatorSelected ? `Meta Operador` : `Meta Logística`;
-   const calculatedGoalValue = useMemo(() => {
+
+  const showMetricsPlaceholders = !metrics || (attendedVsOthersData.length === 0);
+  const showHourlyPlaceholder = !timeSeriesData || timeSeriesData.length === 0 || hourlyChartData.every(d => d.value === 0);
+  const isOperatorSelected = selectedOperatorId !== 'all';
+  const metaTitle = isOperatorSelected ? `Meta Operador` : `Meta Logística`;
+
+  const calculatedGoalValue = useMemo(() => {
        const numericGoal = parseFloat(goalValue);
        if (isNaN(numericGoal) || numericGoal <= 0) return 0;
        if (!isOperatorSelected) {
            return numericGoal;
        } else {
            const totalOperators = operatorsList?.length || 1;
+           if (totalOperators === 0) return numericGoal; 
            return numericGoal / totalOperators;
        }
    }, [goalValue, isOperatorSelected, operatorsList?.length]);
+
    const formattedGoalValue = useMemo(() => {
         if (calculatedGoalValue === 0) return 'Defina a Meta';
         if (!isOperatorSelected) {
@@ -47,35 +53,104 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
              return 'N/A';
         }
    }, [calculatedGoalValue, isOperatorSelected]);
+
     const callsRealized = metrics?.sucessoTabulacoesCount || 0;
-    const callsRemaining = Math.max(0, calculatedGoalValue - callsRealized);
+
    const goalChartData = useMemo(() => {
-    if (calculatedGoalValue <= 0) return [];
-    
-    const percentageAchieved = (callsRealized / calculatedGoalValue) * 100;
-    
-    if (percentageAchieved >= 100) {
-        return [{
-            label: 'Realizado',
-            value: percentageAchieved,
-            color: percentageAchieved > 100 ? '#f97316' : '#10b981'
-        }];
-    }
-    
-    return [
-        { label: 'Realizado', value: callsRealized, color: '#10b981' },
-        { label: 'Restante', value: callsRemaining, color: '#e5e7eb' }
-    ];
-}, [calculatedGoalValue, callsRealized, callsRemaining]);
-   const percentageAchieved = useMemo(() => {
+        if (calculatedGoalValue <= 0) return []; 
+        
+        const percentageAchieved = (callsRealized / calculatedGoalValue) * 100;
+        
+        if (percentageAchieved >= 100) {
+            // Passa a porcentagem para o DoughnutChart, que irá decompor.
+            // O valor absoluto de 'callsRealized' será usado para o tooltip se necessário.
+            return [{
+                label: 'Realizado', 
+                value: percentageAchieved, 
+                absoluteValue: callsRealized, // Passa o valor absoluto para o tooltip
+                color: '#10b981' 
+            }];
+        }
+        
+        const callsRemainingValue = Math.max(0, calculatedGoalValue - callsRealized);
+        return [
+            { label: 'Realizado', value: callsRealized, absoluteValue: callsRealized, color: '#10b981' },
+            { label: 'Restante', value: callsRemainingValue, absoluteValue: callsRemainingValue, color: '#e5e7eb' }
+        ];
+    }, [calculatedGoalValue, callsRealized]);
+
+
+   const percentageAchievedText = useMemo(() => { 
        if (calculatedGoalValue <= 0) return 0;
-       const percentage = (callsRealized / calculatedGoalValue) * 100;
-       return Math.min(100, percentage);
+       return (callsRealized / calculatedGoalValue) * 100;
    }, [callsRealized, calculatedGoalValue]);
+
     const goalCenterText = useMemo(() => {
         if (calculatedGoalValue <= 0) return 'Defina a Meta';
-        return `${percentageAchieved.toFixed(0)}%`;
-    }, [percentageAchieved, calculatedGoalValue]);
+        return `${percentageAchievedText.toFixed(0)}%`;
+    }, [percentageAchievedText, calculatedGoalValue]);
+
+  const hourlyChartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+        x: {
+            type: 'category',
+            grid: {
+                display: false,
+            },
+            ticks: {
+                autoSkip: true,
+                maxTicksLimit: 13,
+                font: {
+                    size: 10,
+                },
+            },
+        },
+        y: {
+            beginAtZero: true,
+            grid: {
+                color: '#e2e8f0',
+                borderColor: '#cbd5e1',
+            },
+            ticks: {
+                font: {
+                    size: 10,
+                },
+                callback: function (value) {
+                    if (value >= 1000) {
+                        return (value / 1000) + 'k';
+                    }
+                    return value;
+                }
+            }
+        }
+    },
+    plugins: {
+        legend: {
+            display: false
+        },
+        tooltip: {
+            backgroundColor: '#1e293b',
+            titleColor: '#f8fafc',
+            bodyColor: '#f8fafc',
+            borderColor: '#334155',
+            borderWidth: 1,
+            padding: 10,
+            cornerRadius: 4,
+            displayColors: false,
+            callbacks: {
+                title: function (tooltipItems) {
+                    return tooltipItems[0].label;
+                },
+                label: function (tooltipItem) {
+                    return `Chamadas: ${tooltipItem.raw.value || tooltipItem.raw}`;
+                }
+            }
+        }
+    }
+  }), []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -124,7 +199,8 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
                            <DoughnutChart
                              data={goalChartData}
                              title={metaTitle}
-                             showOverachievement={true}
+                             showOverachievement={true} 
+                             displayValuesAsAbsolute={true} 
                            />
                        ) : (
                             <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-center px-4">
@@ -194,7 +270,12 @@ function PerformanceMetrics({ metrics, timeSeriesData, goalValue, operatorsList,
                  Sem dados horários para o período/filters selecionados.
               </div>
            ) : (
-              <BarChart data={hourlyChartData} title="" horizontal={false} />
+              <BarChart 
+                data={hourlyChartData} 
+                title="" 
+                horizontal={false}
+                options={hourlyChartOptions}
+              />
            )}
         </div>
       </div>
