@@ -77,7 +77,7 @@ function BrazilMap({
     svg.selectAll('*').remove();
     legendSvg.selectAll('*').remove();
 
-    if (loadingGeoJson || !geoJsonData || errorGeoJson || !ufToRegionMap) {
+    if (loadingGeoJson || !geoJsonData || errorGeoJson || !ufToRegionMap || !mapRef.current) {
       return;
     }
 
@@ -109,20 +109,28 @@ function BrazilMap({
       const colorScale = d3
         .scaleSequential(colorInterpolator)
         .domain(higherIsBetter ? [minMetricValue, maxMetricValue] : [maxMetricValue, minMetricValue]);
-      const width = 960,
-        height = 600;
+      
+      const containerWidth = mapRef.current.clientWidth;
+      const width = containerWidth; 
+      const height = width * (600/960); // Mantém a proporção original
+
       const projection = d3
         .geoMercator()
         .center([-52, -14])
-        .scale(850)
+        .scale(width * 0.88) // Ajustar a escala com base na nova largura
         .translate([width / 2, height / 2]);
       const path = d3.geoPath().projection(projection);
+      
       svg
-        .attr('viewBox', `0 0 ${width} ${height}`)
+        .attr('viewBox', `0 0 ${width} ${height}`) // viewBox continua usando as dimensões relativas
         .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('width', '100%') // SVG ocupa 100% do container
+        .style('height', 'auto') // Altura automática para manter proporção
         .style('max-height', displayMode === 'navigation' ? '500px' : 'auto');
+
       const mapGroup = svg.append('g');
       const textGroup = svg.append('g').attr('class', 'state-labels');
+
       geoJsonData.features.forEach((feature) => {
         const stateAbbr = feature.properties.sigla;
         const stateName = feature.properties.name;
@@ -137,10 +145,12 @@ function BrazilMap({
         const stateInfo = stateMetrics[stateAbbr];
         const metricValue = stateInfo ? metricAccessor(stateInfo) : undefined;
         const isHighlighted = selectedMapRegion === 'all' || (featureRegion && selectedMapRegion === featureRegion);
+        
         let fillColor = '#E5E7EB';
         let strokeColor = '#FFFFFF';
         let strokeWidth = 0.5;
         let fillOpacity = 1;
+
         if (stateInfo && metricValue !== undefined && metricValue !== null && typeof metricValue === 'number' && !isNaN(metricValue)) {
             try {
                 fillColor = colorScale(metricValue);
@@ -157,6 +167,7 @@ function BrazilMap({
         } else {
             fillColor = '#CBD5E1';
         }
+
         if (isHighlighted && displayMode === 'navigation') {
            strokeColor = '#0f172a';
            strokeWidth = 1.5;
@@ -166,6 +177,7 @@ function BrazilMap({
            strokeColor = '#FFFFFF';
            strokeWidth = 0.5;
         }
+
         mapGroup
           .append('path')
           .datum(feature)
@@ -177,17 +189,17 @@ function BrazilMap({
           .attr('fill-opacity', fillOpacity)
           .style(
             'pointer-events',
-            (displayMode === 'navigation' && isHighlighted) ? 'all' : 'none'
+            (displayMode === 'navigation' && isHighlighted && stateInfo) ? 'all' : 'none'
           )
-          .style('cursor', (displayMode === 'navigation' && isHighlighted) ? 'pointer' : 'default')
+          .style('cursor', (displayMode === 'navigation' && isHighlighted && stateInfo) ? 'pointer' : 'default')
           .style(
             'transition',
             'fill 0.2s, stroke 0.2s, stroke-width 0.2s, fill-opacity 0.2s'
           )
            .order()
           .on(
-            'mouseover',
-            (displayMode === 'navigation' && isHighlighted)
+            'mousemove', // Mudado de mouseover para mousemove para tooltip seguir o cursor
+            (displayMode === 'navigation' && isHighlighted && stateInfo)
               ? (event) => {
                      d3.select(event.currentTarget)
                        .attr('stroke-width', 2.5)
@@ -195,18 +207,21 @@ function BrazilMap({
                   let tooltipContent = stateInfo
                     ? `${stateName} (${stateAbbr})<br/>Total Ligações: ${stateInfo.totalLigações !== undefined && stateInfo.totalLigações !== null ? stateInfo.totalLigações.toLocaleString('pt-BR') : 'N/A'}<br/>Taxa Sucesso: ${stateInfo.taxaSucesso !== undefined && stateInfo.taxaSucesso !== null ? dataUtils.formatPercentage(stateInfo.taxaSucesso) : 'N/A'}`
                     : `${stateName} (${stateAbbr}): Sem dados`;
+                  
+                  // Posição relativa ao SVG container
+                  const [mouseX, mouseY] = d3.pointer(event, svg.node());
                   setTooltip({
                     show: true,
                     content: tooltipContent,
-                    x: event.pageX,
-                    y: event.pageY,
+                    x: mouseX, // Usar coordenadas relativas ao SVG
+                    y: mouseY, // Usar coordenadas relativas ao SVG
                   });
                 }
               : null
           )
           .on(
             'mouseout',
-            (displayMode === 'navigation' && isHighlighted)
+            (displayMode === 'navigation' && isHighlighted && stateInfo)
               ? (event) => {
                   setTooltip({ show: false, content: '', x: 0, y: 0 });
                    const originalStrokeWidth = (selectedMapRegion !== 'all' && displayMode === 'navigation' && selectedMapRegion === featureRegion) ? 1.5 : 0.5;
@@ -323,18 +338,13 @@ function BrazilMap({
     ufToRegionMap
   ]);
 
-   const handleMouseMove = useCallback((event) => {
-        if (tooltip.show && tooltipRef.current) {
-             setTooltip(prev => ({ ...prev, x: event.pageX, y: event.pageY }));
-        }
-    }, [tooltip.show]);
+  // Removido o handleMouseMove global e o onMouseOut do container principal.
+  // O tooltip agora é posicionado relativo ao SVG.
 
   return (
     <div
       data-name="brazil-map-container"
-      className="w-full h-full flex flex-col items-center"
-       onMouseMove={displayMode === 'navigation' ? handleMouseMove : null}
-       onMouseOut={displayMode === 'navigation' ? () => setTooltip({ show: false, content: '', x: 0, y: 0 }) : null}
+      className="w-full h-full flex flex-col items-center relative" // Adicionado relative para posicionar tooltip
     >
       {loadingGeoJson && (
         <div className="flex-grow flex items-center justify-center text-slate-500 text-sm p-4">
@@ -350,7 +360,7 @@ function BrazilMap({
       )}
       {!loadingGeoJson && !errorGeoJson && geoJsonData && (
         <>
-          <div className="flex-grow relative w-full max-w-[600px]">
+          <div className="flex-grow relative w-full max-w-[700px]"> {/* Aumentado max-width para melhor visualização */}
              {Object.keys(data || {}).length === 0 ? (
                   <div className="absolute inset-0 flex items-center justify-center text-slate-500">
                      Sem dados geográficos para o período/filters selecionados.
@@ -369,11 +379,14 @@ function BrazilMap({
        {displayMode === 'navigation' && tooltip.show && (
         <div
           ref={tooltipRef}
-          className="fixed bg-slate-800 text-white px-2.5 py-1.5 rounded-md text-xs shadow-lg pointer-events-none z-50 transition-opacity duration-150"
+          className="absolute bg-slate-800 text-white px-2.5 py-1.5 rounded-md text-xs shadow-lg pointer-events-none z-50 transition-opacity duration-150"
           style={{
-            left: `${tooltip.x}px`,
+            // Posicionamento do tooltip relativo ao container do mapa
+            // O d3.pointer já nos dá as coordenadas relativas ao SVG
+            left: `${tooltip.x}px`, 
             top: `${tooltip.y}px`,
-            transform: 'translate(15px, -25px)',
+            // Pequeno ajuste para não cobrir o cursor e ficar próximo ao ponto
+            transform: 'translate(10px, -20px)', 
             visibility: tooltip.show ? 'visible' : 'hidden',
           }}
           dangerouslySetInnerHTML={{ __html: tooltip.content }}
